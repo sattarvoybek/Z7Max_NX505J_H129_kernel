@@ -30,7 +30,10 @@
 #include <linux/of_gpio.h>
 #include <linux/qpnp/qpnp-adc.h>
 #include <bq24192_charger.h>
+#ifdef CONFIG_ZTEMT_BATTERY_MAX17050
 #include <max17050_battery.h>
+#endif
+
 #ifdef CONFIG_SLIMPORT_FAST_CHARGE
 #include "../drivers/video/msm/mdss/slimport_anx7808/slimport.h"
 #endif
@@ -41,9 +44,6 @@
 #endif
 
 #define DRIVER_VERSION			"1.0.0"
-
-//REG 00
-#define BQ_LIMIT_V_MASK		0x78
 
 //REG 01
 #define BQ_MIN_SYS_V_MASK		0x0E
@@ -128,6 +128,7 @@ struct bq24192_chg_chip {
 	int batt_soc;
 	
 	int ibatmax_ma;
+	int vusb_min;
 	int iusb_init_ma;
 	int iterm_ma;
 	int vbatt_max;
@@ -140,6 +141,7 @@ struct bq24192_chg_chip {
 	bool soc_chg_done;
 	bool in_rechging;
 	bool is_hvdcp_chg;
+	bool is_chg_full;
 };
 
 static struct bq24192_chg_chip   *bq_chip;
@@ -152,25 +154,26 @@ static int charger_online = 0;
 
 extern int qpnp_get_battery_temp(void);
 extern int qpnp_dcdc_enable(int enable);
-static int32_t bq24192_get_temp_status(const struct batt_status_map *pts,
-		uint32_t tablesize, int input);
+static int bq24192_get_temp_status(const struct batt_status_map *pts,
+		uint32_t tablesize, int input, int *batt_status);
+
 
 #ifdef CONFIG_ZTEMT_NX506J_CHARGE
 static const struct batt_status_map batt_temp_map[] = {
-	{CHG_TEMP_MIN, CHG_TEMP_COLD, BATT_STATUS_COLD, 0}, 
-	{CHG_TEMP_COLD, CHG_TEMP_COOL, BATT_STATUS_COOL1, 1500}, 
-	{CHG_TEMP_COOL, CHG_TEMP_WARM, BATT_STATUS_GOOD, 2048}, 
-	{CHG_TEMP_WARM, CHG_TEMP_HOT, BATT_STATUS_WARM, 1500}, 
-	{CHG_TEMP_HOT, CHG_TEMP_MAX, BATT_STATUS_HOT, 0}, 
+	{-300,  -50, BATT_STATUS_COLD,    0}, 
+	{ -50,  100, BATT_STATUS_COOL1, 800}, 
+	{ 100,  430, BATT_STATUS_GOOD, 1984}, 
+	{ 430,  500, BATT_STATUS_WARM,  800}, 
+	{ 500,  800, BATT_STATUS_HOT,     0}, 
 };
 #else
 static const struct batt_status_map batt_temp_map[] = {
-	{CHG_TEMP_MIN, CHG_TEMP_COLD, BATT_STATUS_COLD, 0}, 
-	{CHG_TEMP_COLD, CHG_TEMP_COOL, BATT_STATUS_COOL1, 850}, 
+	{CHG_TEMP_MIN,  CHG_TEMP_COLD, BATT_STATUS_COLD,     0}, 
+	{CHG_TEMP_COLD, CHG_TEMP_COOL, BATT_STATUS_COOL1,  850}, 
 	{CHG_TEMP_COOL, CHG_TEMP_GOOD, BATT_STATUS_COOL2, 2000},  
-	{CHG_TEMP_GOOD, CHG_TEMP_WARM, BATT_STATUS_GOOD, 2800}, 
-	{CHG_TEMP_WARM, CHG_TEMP_HOT, BATT_STATUS_WARM, 2000}, 
-	{CHG_TEMP_HOT, CHG_TEMP_MAX, BATT_STATUS_HOT, 0}, 
+	{CHG_TEMP_GOOD, CHG_TEMP_WARM, BATT_STATUS_GOOD,  2800}, 
+	{CHG_TEMP_WARM, CHG_TEMP_HOT,  BATT_STATUS_WARM,  2000}, 
+	{CHG_TEMP_HOT,  CHG_TEMP_MAX,  BATT_STATUS_HOT,      0}, 
 };
 #endif
 
@@ -326,6 +329,22 @@ static int	bq24192_set_chg_iusb(struct bq24192_chg_chip *chip, enum input_curren
 		return rc;
 	}
 	return 0;
+}
+
+static int  bq24192_set_chg_voltage(struct bq24192_chg_chip *chip, int input_vol)
+{
+	u8 temp;
+
+	if (input_vol < BQ24192_INPUTVOL_MIN_MV || input_vol > BQ24192_INPUTVOL_MAX_MV) {
+		pr_err("bad current = %dmA asked to set\n", input_vol);
+		return -EINVAL;
+	}
+
+	temp = (input_vol - BQ24192_INPUTVOL_MIN_MV)/BQ24192_INPUTVOL_STEP_MV;
+	temp = temp << BQ24192_INPUTVOL_SHIFT;
+	
+	BQLOG_INFO("set iterm=0x%x\n",temp);
+	return bq24192_masked_write(chip, BQ24192_REG_INPUT_LIMIT,BQ_INPUTVOL_MASK,temp);
 }
 
 //Reg 0x1 ---------------------------------------------------------------
@@ -580,6 +599,7 @@ int bq24192_is_charger_online(void)
 int bq24192_get_batt_stauts(void)
 {
 	int batt_temp;
+	int batt_status;
 
 	if (!bq_chip) {
 	    pr_err("%s:called before init\n",__func__);
@@ -588,7 +608,8 @@ int bq24192_get_batt_stauts(void)
 
 	if(!bq_chip->in_work){
 		batt_temp = qpnp_get_battery_temp();
-		return bq24192_get_temp_status(batt_temp_map, ARRAY_SIZE(batt_temp_map), batt_temp);
+		bq24192_get_temp_status(batt_temp_map, ARRAY_SIZE(batt_temp_map), batt_temp, &batt_status);
+		return batt_status;
 	}
 
     return bq_chip->batt_status;
@@ -664,6 +685,7 @@ int  bq24192_notify_charger(enum bq_chg_type chg_type)
 	}
 	return 0;
 }
+EXPORT_SYMBOL_GPL(bq24192_notify_charger);
 
 int  bq24192_get_chg_status(void)
 {
@@ -689,67 +711,59 @@ int  bq24192_get_chg_status(void)
 
 #define BATT_TEMTP_DELTA    20
 #define TEMP_INIT    -500
-static int32_t bq24192_get_temp_status(const struct batt_status_map *pts,
-		uint32_t tablesize, int input)
+static int bq24192_get_temp_status(const struct batt_status_map *pts,
+		uint32_t tablesize, int input, int *batt_status)
 {
-	uint32_t i = 0;
-	int batt_status;
-	static int last_status = BATT_STATUS_UNKNOW;
-	static int last_temp = TEMP_INIT;
+	static int current_index = 0;
+	static int init_status = 1;
 
-	if ( pts == NULL )
+	if ( pts == NULL || batt_status == NULL)
 		return BATT_STATUS_UNKNOW;
-
-	if(input == last_temp)
-		return last_status;
 		
-	if(last_status == BATT_STATUS_UNKNOW){
-		while (i < tablesize) {
-			if ( (pts[i].low_temp <= input) && (input <= pts[i].high_temp) ) 
+	if(init_status){
+		while (current_index < tablesize) {
+			if ( (pts[current_index].low_temp <= input) && (input <= pts[current_index].high_temp) ) 
 				break;
 			else 
-				i++;
+				current_index++;
 		}
-		
-		if ( i < tablesize )
-			batt_status = pts[i].batt_st;
-    	else 
-			batt_status = BATT_STATUS_UNKNOW;
-
-		BQLOG_DEBUG("-First-input=%d  batt_status=%d \n",input,batt_status);
+		init_status = 0;
+		BQLOG_DEBUG("-First-input=%d  current_index=%d \n",input,current_index);
 	}else{
-		if(input < (pts[last_status].low_temp - BATT_TEMTP_DELTA))
-			batt_status = last_status - 1;
-		else if(input > pts[last_status].high_temp)
-			batt_status = last_status + 1;
-		else
-		    batt_status = last_status;
+		if(input < (pts[current_index].low_temp - BATT_TEMTP_DELTA))
+			current_index--;
+		else if(input > pts[current_index].high_temp)
+			current_index++;
 	}
 
-	BQLOG_DEBUG("input=%d  batt_status=%d \n",input,batt_status);
-	
-	last_temp = input;
-	last_status = batt_status;
-		
-	if(batt_status>=BATT_STATUS_COLD && batt_status<=BATT_STATUS_UNKNOW)
-		return batt_status;
+    if(current_index < 0)
+		*batt_status = BATT_STATUS_COLD;
+	else if(current_index >= tablesize)
+		*batt_status = BATT_STATUS_HOT;
 	else
-		return last_status;
+		*batt_status = pts[current_index].batt_st;
+
+	BQLOG_DEBUG("input=%d  batt_status=%d \n",input,*batt_status);
+	
+	return current_index;
+
 }
 
 static void bq24192_chg_temp_cntl(struct bq24192_chg_chip *chip,int batt_temp)
 {
     int battery_status;
 	int batt_current = 0;
+	int state_index;
 
-	battery_status = bq24192_get_temp_status(batt_temp_map,
+	state_index = bq24192_get_temp_status(batt_temp_map,
 		                                     ARRAY_SIZE(batt_temp_map),
-		                                     batt_temp);
+		                                     batt_temp,
+		                                     &battery_status);
 	if(battery_status != BATT_STATUS_UNKNOW)
-	    batt_current = batt_temp_map[battery_status].batt_current;
+	    batt_current = batt_temp_map[state_index].batt_current;
 		
 	if(battery_status != chip->batt_status && chip->usb_in){
-		BQLOG_INFO("new_battery_status=%d chip->batt_status=%d\n",battery_status,chip->batt_status);
+		BQLOG_INFO("last chip->batt_status=%d new_battery_status=%d\n",chip->batt_status,battery_status);
 		if(batt_current > 0){
 		    bq24192_hiz_mode_enable(chip,0);
 			bq24192_set_chg_ibatt(chip,batt_current);
@@ -799,6 +813,7 @@ static void bq24192_chg_status_reset(struct bq24192_chg_chip *chip)
 {	
 	chip->temp_abnormal = 0;
 	chip->soc_chg_done = 0;
+	chip->is_chg_full = 0;
 	chip->batt_status = BATT_STATUS_UNKNOW;
 	chip->chg_type = BQ_INVALID_CHARGER;
 }
@@ -839,7 +854,17 @@ static void bq24192_chg_worker(struct work_struct *work)
 	if( chip->chg_status == BQ_CHGING_DONE || chip->chg_status == BQ_NOT_CHGING  || chip->batt_i<0 )
 		qpnp_dcdc_enable(1);
 
-    //to avoid watchdog timeout 
+	//charge full check
+	if(chip->chg_status == BQ_CHGING_DONE){
+		if(!chip->is_chg_full){
+			BQLOG_INFO("charging is full.\n");
+			bq24192_update_power_supply(chip);
+			chip->is_chg_full = 1;
+		}
+	}else
+	    chip->is_chg_full = 0;
+
+    //to avoid  reseting vbatmax because of watchdog timeout
 	if(chip->batt_vol > 4100)
 		bq24192_set_vbattmax(chip,chip->vbatt_max);
 
@@ -885,10 +910,12 @@ int  bq24192_set_chg_status(int usb_in)
     bq_chip->usb_in = usb_in;  
 	
 	if(usb_in){
+		bq24192_chg_gpio_enable(bq_chip,1);
 		wake_lock(&bq_chip->wlock);
 		schedule_delayed_work(&bq_chip->chg_work,
 			   round_jiffies_relative(msecs_to_jiffies(START_CHG_MS)));
-	}
+	}else
+	    bq24192_chg_gpio_enable(bq_chip,0);
 	
  	return 0;
 }
@@ -984,6 +1011,12 @@ bq24192_charger_read_dt_props(struct bq24192_chg_chip *chip)
 		return rc;
 	}
 
+	rc = of_property_read_u32(chip->dev_node, "bq-vusb-min", &chip->vusb_min);
+	if (rc) {
+		pr_err( "Unable to parse 'bq-vusb-min'\n");
+		return rc;
+	}
+
 	rc = of_property_read_u32(chip->dev_node, "bq-iterm-ma", &chip->iterm_ma);
 	if (rc) {
 		pr_err( "Unable to parse 'bq-iterm-ma'\n");
@@ -1038,7 +1071,7 @@ static int bq24192_chg_hw_init(struct bq24192_chg_chip *chip)
 		pr_err("%s: fail gpio_request(%d)=%d\n", __func__,chip->chg_en_gpio, ret);
 	}
 	gpio_tlmm_config(GPIO_CFG(chip->chg_en_gpio, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),GPIO_CFG_ENABLE);
-	bq24192_chg_gpio_enable(chip,1);
+	bq24192_chg_gpio_enable(chip,0);
 
     //irq  gpio
     #if 0
@@ -1074,6 +1107,12 @@ static int bq24192_chg_hw_init(struct bq24192_chg_chip *chip)
 		return ret;
 	}
 
+    ret = bq24192_set_chg_voltage(chip,chip->vusb_min);
+	if (ret) {
+		pr_err("failed set charging voltage rc=%d\n", ret);
+		return ret;
+	}	
+	
 	ret = bq24192_set_chg_ibatt(chip,chip->ibatmax_ma);
 	if (ret) {
 		pr_err("failed set charging ibatt rc=%d\n", ret);

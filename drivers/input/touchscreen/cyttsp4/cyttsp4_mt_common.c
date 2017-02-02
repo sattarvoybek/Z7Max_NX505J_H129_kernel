@@ -263,7 +263,7 @@ static int cyttsp4_xy_worker(struct cyttsp4_mt_data *md)
     		md->mt_function.input_report(md->input, ABS_MT_TRACKING_ID,
     			0, CY_OBJ_STANDARD_FINGER);
 
-    	input_report_abs(md->input, ABS_MT_PRESSURE, 300);
+    	input_report_abs(md->input, ABS_MT_PRESSURE, 1000);
 
     	if (md->mt_function.input_sync)
     		md->mt_function.input_sync(md->input);

@@ -444,6 +444,12 @@ int msm_camera_get_dt_power_setting_data(struct device_node *of_node,
 				ps[i].seq_val = SENSOR_GPIO_STANDBY;
 			else if (!strcmp(seq_name, "sensor_gpio_vdig"))
 				ps[i].seq_val = SENSOR_GPIO_VDIG;
+			//added by ztemt start
+			else if (!strcmp(seq_name, "sensor_gpio_vaf"))
+				ps[i].seq_val = SENSOR_GPIO_VAF;
+			else if (!strcmp(seq_name, "sensor_gpio_vana"))
+				ps[i].seq_val = SENSOR_GPIO_VANA;
+			//added by ztemt end
 			else
 				rc = -EILSEQ;
 			break;
@@ -773,7 +779,7 @@ int msm_camera_init_gpio_pin_tbl(struct device_node *of_node,
 
 #endif
 
-#ifdef CONFIG_ZTE_CAMERA_Z7
+#if defined(CONFIG_ZTE_CAMERA_Z7)||defined(CONFIG_ZTE_CAMERA_NX504J)
 	if (of_property_read_bool(of_node, "qcom,gpio-vaf") == true) {
 		rc = of_property_read_u32(of_node, "qcom,gpio-vaf", &val);
 		if (rc < 0) {
@@ -788,10 +794,31 @@ int msm_camera_init_gpio_pin_tbl(struct device_node *of_node,
 		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VAF] =
 			gpio_array[val];
 		gconf->gpio_num_info->valid[SENSOR_GPIO_VAF] = 1;
+
 		CDBG("%s qcom,gpio-vaf %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VAF]);
 	}
 
+#endif
+#ifdef CONFIG_ZTE_CAMERA_NX504J
+if (of_property_read_bool(of_node, "qcom,gpio-vana") == true) {
+		rc = of_property_read_u32(of_node, "qcom,gpio-vana", &val);
+		if (rc < 0) {
+			pr_err("%s:%d read qcom,gpio-vana failed rc %d\n",
+				__func__, __LINE__, rc);
+			goto ERROR;
+		} else if (val >= gpio_array_size) {
+			pr_err("%s:%d qcom,gpio-vana invalid %d\n",
+				__func__, __LINE__, val);
+			goto ERROR;
+		}
+		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VANA] =
+			gpio_array[val];
+		gconf->gpio_num_info->valid[SENSOR_GPIO_VANA] = 1;
+
+		CDBG("%s qcom,gpio-vana %d\n", __func__,
+			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VANA]);
+	}
 #endif
 	if (of_property_read_bool(of_node, "qcom,gpio-reset") == true) {
 		rc = of_property_read_u32(of_node, "qcom,gpio-reset", &val);
@@ -1095,8 +1122,6 @@ int msm_camera_power_up(struct msm_camera_power_ctrl_t *ctrl,
 				(power_setting->delay * 1000) + 1000);
 		}
 	}
-#if defined(CONFIG_IMX135_Z5S_069) || defined(CONFIG_IMX135_Z5S) || defined(CONFIG_IMX135) || defined(CONFIG_IMX135_GBAO) || defined(CONFIG_IMX135_GBAO_LC898122)
-#else
 	if (device_type == MSM_CAMERA_PLATFORM_DEVICE) {
 		rc = sensor_i2c_client->i2c_func_tbl->i2c_util(
 			sensor_i2c_client, MSM_CCI_INIT);
@@ -1105,18 +1130,14 @@ int msm_camera_power_up(struct msm_camera_power_ctrl_t *ctrl,
 			goto power_up_failed;
 		}
 	}
-#endif
 	CDBG("%s exit\n", __func__);
 	return 0;
 power_up_failed:
 	pr_err("%s:%d failed\n", __func__, __LINE__);
-#if defined(CONFIG_IMX135_Z5S_069) || defined(CONFIG_IMX135_Z5S) || defined(CONFIG_IMX135) || defined(CONFIG_IMX135_GBAO) || defined(CONFIG_IMX135_GBAO_LC898122)
-#else
 	if (device_type == MSM_CAMERA_PLATFORM_DEVICE) {
 		sensor_i2c_client->i2c_func_tbl->i2c_util(
 			sensor_i2c_client, MSM_CCI_RELEASE);
 	}
-#endif
 	for (index--; index >= 0; index--) {
 		CDBG("%s index %d\n", __func__, index);
 		power_setting = &ctrl->power_setting[index];

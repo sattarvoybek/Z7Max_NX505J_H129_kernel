@@ -301,14 +301,20 @@ enum rgb_led_mode {
 
 static int  ztemt_mode;
 
-struct pwm_device   *pwm_dev_red=NULL;
-struct pwm_device   *pwm_dev_green=NULL;
-struct pwm_device   *pwm_dev_blue=NULL;
+struct ztemt_pwm_device{
+	struct pwm_device	*pwm_dev_red;
+    struct pwm_device	*pwm_dev_green;
+    struct pwm_device	*pwm_dev_blue;
+};
+
+struct ztemt_pwm_device *ztemt_pwm_dev=NULL;
+
 
 enum channel_num{ 
 	CHANNEL_RED=16,
 	CHANNEL_GREEN=32,
 	CHANNEL_BLUE=8,
+	CHANNEL_GREEN_BLUE=40,
 };
 
 static int  ztemt_channel;
@@ -326,6 +332,7 @@ static int fullon_time= 0;
 static int fulloff_time= 0;
 static char fade_parameter[FADE_PARAM_LEN];
 
+static bool ztemt_flag=false;
 #endif
 
 #ifdef CONFIG_ZTEMT_RGB_BREATH_LEDS_DEBUG
@@ -333,6 +340,8 @@ static char fade_parameter[FADE_PARAM_LEN];
 #else
 #define ztemt_rgb_led_debug(fmt, args...) do {} while(0)
 #endif
+
+
 
 static u8 wled_debug_regs[] = {
 	/* common registers */
@@ -1549,15 +1558,15 @@ static int __devinit qpnp_led_set_max_brightness(struct qpnp_led_data *led)
 #ifdef CONFIG_ZTEMT_RGB_BREATH_LEDS
 	case QPNP_ID_RGB_RED:
 	    led->cdev.max_brightness = RGB_MAX_LEVEL;
-	    pwm_dev_red=led->rgb_cfg->pwm_cfg->pwm_dev;
+	    ztemt_pwm_dev->pwm_dev_red=led->rgb_cfg->pwm_cfg->pwm_dev;
 		break;
 	case QPNP_ID_RGB_GREEN:
 		led->cdev.max_brightness = RGB_MAX_LEVEL;
-		pwm_dev_green=led->rgb_cfg->pwm_cfg->pwm_dev;
+		ztemt_pwm_dev->pwm_dev_green=led->rgb_cfg->pwm_cfg->pwm_dev;
 		break;
 	case QPNP_ID_RGB_BLUE:
 		led->cdev.max_brightness = RGB_MAX_LEVEL;
-		pwm_dev_blue=led->rgb_cfg->pwm_cfg->pwm_dev;
+		ztemt_pwm_dev->pwm_dev_blue=led->rgb_cfg->pwm_cfg->pwm_dev;
 		break;
 #else
 	case QPNP_ID_RGB_RED:
@@ -2373,6 +2382,7 @@ static ssize_t outn_store(struct device *dev,
 	struct device_attribute *attr,
 	const char *buf, size_t count)
 {
+
 	sscanf(buf, "%d", &ztemt_channel);
 	ztemt_rgb_led_debug("%s : %d : ztemt_channel=%d \n",__func__,__LINE__,ztemt_channel);
 	return count;
@@ -2382,6 +2392,26 @@ static ssize_t outn_show(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
 	return sprintf(buf, "%d\n",ztemt_channel);	
+}
+
+
+static void qpnp_led_set_2(struct led_classdev *led_cdev,
+				enum led_brightness value)
+{
+	struct qpnp_led_data *led;
+
+	led = container_of(led_cdev, struct qpnp_led_data, cdev);
+	if (value < LED_OFF) {
+		dev_err(&led->spmi_dev->dev, "Invalid brightness value\n");
+		return;
+	}
+
+	if (value > led->cdev.max_brightness)
+		value = led->cdev.max_brightness;
+
+	led->cdev.brightness = value;
+	//schedule_work(&led->work);
+	qpnp_led_work(&led->work);
 }
 
 
@@ -2416,7 +2446,9 @@ static void ztemt_qpnp_led_set(struct led_classdev *led_cdev,
     u32 pause_hi=0;
     u32 previous_pause_hi=0;
     u32 previous_lut_flags=0;
-    
+
+	if((ztemt_channel==CHANNEL_GREEN)||(ztemt_flag==true))return;
+
     ztemt_mode=value;
     ztemt_rgb_led_debug("%s : %d : ztemt_mode=%d \n",__func__,__LINE__,ztemt_mode);
 
@@ -2471,12 +2503,12 @@ static void ztemt_qpnp_led_set(struct led_classdev *led_cdev,
 		pwm_cfg->mode = pwm_cfg->default_mode;
 		previous_brightness=led->cdev.brightness;
 
-#ifdef CONFIG_ZTEMT_RGB_BREATH_LEDS_NX507J
+#if defined(CONFIG_ZTEMT_RGB_BREATH_LEDS_NX507J)||defined(CONFIG_ZTEMT_RGB_BREATH_LEDS_NX507H)
 	    if((ztemt_channel==CHANNEL_GREEN) || (ztemt_channel==CHANNEL_BLUE)){
 		  led->cdev.brightness =5;	
 	    }else	
    		  led->cdev.brightness =brightness;	
-#elif defined CONFIG_ZTEMT_RGB_BREATH_LEDS_NX505J
+#elif defined(CONFIG_ZTEMT_RGB_BREATH_LEDS_NX505J) || defined(CONFIG_ZTEMT_RGB_BREATH_LEDS_NX505H)
         if((ztemt_channel==CHANNEL_GREEN) || (ztemt_channel==CHANNEL_BLUE)){
 		  led->cdev.brightness =30;	
 	    }else	
@@ -2690,8 +2722,70 @@ static void ztemt_qpnp_led_set(struct led_classdev *led_cdev,
 
 	}
 	else return;
-		
-    mutex_lock(&led->lock);
+
+    if(ztemt_channel==CHANNEL_RED){
+
+        if(ztemt_flag==true)return;
+
+	    led->cdev.name="red";
+	    led->id=QPNP_ID_RGB_RED;
+	    led->rgb_cfg->enable=RGB_LED_ENABLE_RED;
+	    led->rgb_cfg->pwm_cfg->pwm_channel=6;
+	    led->rgb_cfg->pwm_cfg->pwm_dev=ztemt_pwm_dev->pwm_dev_red;
+        pwm_free(pwm_cfg->pwm_dev);
+	    ret = qpnp_pwm_init(pwm_cfg, led->spmi_dev, led->cdev.name);
+	    if (ret) {
+	       ztemt_rgb_led_debug("%s : %d : qpnp_pwm_init failed...\n",__func__,__LINE__);
+		   dev_err(&led->spmi_dev->dev,"Failed to initialize pwm with new lpg value\n");
+		   return;
+	    }
+        qpnp_led_set(&led->cdev, led->cdev.brightness);
+    }
+
+    //if((ztemt_channel==CHANNEL_GREEN)||(ztemt_channel==CHANNEL_BLUE)){
+    if(ztemt_channel==CHANNEL_BLUE){
+
+        if(ztemt_flag==true)return;
+
+        ztemt_flag=true;
+
+	    led->cdev.name="led:rgb_green";
+	    led->id=QPNP_ID_RGB_GREEN;
+	    led->rgb_cfg->enable=RGB_LED_ENABLE_GREEN;
+	    led->rgb_cfg->pwm_cfg->pwm_channel=5;
+	    led->rgb_cfg->pwm_cfg->pwm_dev=ztemt_pwm_dev->pwm_dev_green;
+        pwm_free(pwm_cfg->pwm_dev);
+	    ret = qpnp_pwm_init(pwm_cfg, led->spmi_dev, led->cdev.name);
+	    if (ret) {
+	       ztemt_rgb_led_debug("%s : %d : qpnp_pwm_init failed...\n",__func__,__LINE__);
+		   dev_err(&led->spmi_dev->dev,"Failed to initialize pwm with new lpg value\n");
+		   ztemt_flag=false;
+		   return;
+	    }
+        qpnp_led_set_2(&led->cdev, led->cdev.brightness);
+
+
+	    led->cdev.name="led:rgb_blue";
+		led->id=QPNP_ID_RGB_BLUE;
+		led->rgb_cfg->enable=RGB_LED_ENABLE_BLUE;
+		led->rgb_cfg->pwm_cfg->pwm_channel=4;
+		led->rgb_cfg->pwm_cfg->pwm_dev=ztemt_pwm_dev->pwm_dev_blue;
+        pwm_free(pwm_cfg->pwm_dev);
+	    ret = qpnp_pwm_init(pwm_cfg, led->spmi_dev, led->cdev.name);
+	    if (ret) {
+	       ztemt_rgb_led_debug("%s : %d : qpnp_pwm_init failed...\n",__func__,__LINE__);
+		   dev_err(&led->spmi_dev->dev,"Failed to initialize pwm with new lpg value\n");
+           ztemt_flag=false;
+		   return;
+	    }
+        qpnp_led_set_2(&led->cdev, led->cdev.brightness);
+
+        ztemt_flag=false;
+
+    }
+
+/*
+   mutex_lock(&led->lock);
 
 	switch (ztemt_channel) {
 		case CHANNEL_RED:
@@ -2699,21 +2793,21 @@ static void ztemt_qpnp_led_set(struct led_classdev *led_cdev,
 		    led->id=QPNP_ID_RGB_RED;
 		    led->rgb_cfg->enable=RGB_LED_ENABLE_RED;
 		    led->rgb_cfg->pwm_cfg->pwm_channel=6;
-		    led->rgb_cfg->pwm_cfg->pwm_dev=pwm_dev_red;
+		    led->rgb_cfg->pwm_cfg->pwm_dev=ztemt_pwm_dev->pwm_dev_red;
 			break;
 		case CHANNEL_GREEN:
 			led->cdev.name="led:rgb_green";
 		    led->id=QPNP_ID_RGB_GREEN;
 		    led->rgb_cfg->enable=RGB_LED_ENABLE_GREEN;
 		    led->rgb_cfg->pwm_cfg->pwm_channel=5;
-		    led->rgb_cfg->pwm_cfg->pwm_dev=pwm_dev_green;
+		    led->rgb_cfg->pwm_cfg->pwm_dev=ztemt_pwm_dev->pwm_dev_green;
 			break;
 		case CHANNEL_BLUE:
 			led->cdev.name="led:rgb_blue";
 		    led->id=QPNP_ID_RGB_BLUE;
 		    led->rgb_cfg->enable=RGB_LED_ENABLE_BLUE;
 		    led->rgb_cfg->pwm_cfg->pwm_channel=4;
-		    led->rgb_cfg->pwm_cfg->pwm_dev=pwm_dev_blue;
+		    led->rgb_cfg->pwm_cfg->pwm_dev=ztemt_pwm_dev->pwm_dev_blue;
 			break; 
 		default:
 	        dev_err(&led->spmi_dev->dev, "Invalid LED chnanel \n");
@@ -2748,10 +2842,12 @@ static void ztemt_qpnp_led_set(struct led_classdev *led_cdev,
 	   qpnp_pwm_init(pwm_cfg, led->spmi_dev, led->cdev.name);
 	   dev_err(&led->spmi_dev->dev,"Failed to initialize pwm with new lpg value\n");
     }	 
-    
+
 	mutex_unlock(&led->lock); 
 	
 	qpnp_led_set(&led->cdev, led->cdev.brightness);	
+*/
+
 	return;
 }
 
@@ -3765,6 +3861,15 @@ static int __devinit qpnp_leds_probe(struct spmi_device *spmi)
 	const char *led_label;
 	bool regulator_probe = false;
 
+#ifdef CONFIG_ZTEMT_RGB_BREATH_LEDS
+	ztemt_pwm_dev = devm_kzalloc(&spmi->dev,
+		sizeof(struct ztemt_pwm_device), GFP_KERNEL);
+	if (!ztemt_pwm_dev) {
+		dev_err(&spmi->dev, "Unable to allocate memory for ztemt_pwm_dev\n");
+		return -ENOMEM;
+	}
+#endif
+
 	node = spmi->dev.of_node;
 	if (node == NULL)
 		return -ENODEV;
@@ -4051,6 +4156,10 @@ static int __devexit qpnp_leds_remove(struct spmi_device *spmi)
 			return -EINVAL;
 		}
 	}
+
+#ifdef CONFIG_ZTEMT_RGB_BREATH_LEDS
+    devm_kfree(&spmi->dev,ztemt_pwm_dev);
+#endif
 
 	return 0;
 }

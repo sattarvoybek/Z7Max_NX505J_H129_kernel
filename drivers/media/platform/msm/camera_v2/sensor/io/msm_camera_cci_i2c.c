@@ -282,7 +282,7 @@ int32_t msm_camera_cci_i2c_write_table_w_microdelay(
 	rc = cci_ctrl.status;
 	return rc;
 }
-#ifdef CONFIG_IMX135
+#ifdef CONFIG_IMX214_APP
 int32_t z7_msm_camera_cci_i2c_write_seq_microdelay(
 	struct msm_camera_i2c_client *client,
 	struct msm_camera_i2c_reg_array *reg_tbl, uint16_t size,

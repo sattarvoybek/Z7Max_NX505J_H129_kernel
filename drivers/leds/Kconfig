@@ -596,12 +596,26 @@ config ZTEMT_RGB_BREATH_LEDS_NX507J
 	help
 	  This option enables support for rgb breath leds .  
 
+config ZTEMT_RGB_BREATH_LEDS_NX507H
+  tristate "ZTEMT Support for rgb breath leds "
+	depends on ZTEMT_RGB_BREATH_LEDS
+	default n
+	help
+	  This option enables support for rgb breath leds .
+
 config ZTEMT_RGB_BREATH_LEDS_NX505J
   tristate "ZTEMT Support for rgb breath leds "
 	depends on ZTEMT_RGB_BREATH_LEDS
 	default n
 	help
 	  This option enables support for rgb breath leds .  
+
+config ZTEMT_RGB_BREATH_LEDS_NX505H
+  tristate "ZTEMT Support for rgb breath leds "
+	depends on ZTEMT_RGB_BREATH_LEDS
+	default n
+	help
+	  This option enables support for rgb breath leds .
 
 
 comment "iptables trigger is under Netfilter config (LED target)"

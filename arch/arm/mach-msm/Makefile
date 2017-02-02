@@ -265,10 +265,9 @@ obj-$(CONFIG_PM8921_BMS) += bms-batterydata.o bms-batterydata-desay.o batterydat
 obj-$(CONFIG_QPNP_BMS) += bms-batterydata.o bms-batterydata-desay.o batterydata-lib.o
 obj-$(CONFIG_QPNP_BMS) += bms-batterydata-oem.o bms-batterydata-qrd-4v35-2000mah.o bms-batterydata-qrd-4v2-1300mah.o
 #ZTEMT Added
-obj-$(CONFIG_ZTEMT_NX504J_CHARGE) += bms_ztemt_batterydata_3500mAh.o
-obj-$(CONFIG_ZTEMT_BATT_2300MAH) += bms_ztemt_batterydata_2300mAh.o
+obj-$(CONFIG_ZTEMT_NX507_BATT_2300MAH) += bms_ztemt_NX507_batterydata_2300mAh.o
 obj-$(CONFIG_ZTEMT_BATT_3000MAH) += bms_ztemt_batterydata_3000mAh.o
-obj-$(CONFIG_ZTEMT_NX503A_CHARGE) += bms_ztemt_NX503A_batterydata_2300mAh.o
+obj-$(CONFIG_ZTEMT_BATT_3000MAH_NX506J) += bms_ztemt_NX506J_batterydata_3000mAh.o
 #ZTEMT END
 obj-$(CONFIG_MACH_APQ8064_CDP) += board-8064-all.o board-8064-regulator.o
 obj-$(CONFIG_MACH_APQ8064_MTP) += board-8064-all.o board-8064-regulator.o
@@ -324,7 +323,6 @@ obj-$(CONFIG_TROUT_BATTCHG) += htc_battery.o
 
 obj-$(CONFIG_HTC_PWRSINK) += htc_pwrsink.o
 obj-$(CONFIG_HTC_HEADSET) += htc_headset.o
-obj-$(CONFIG_MSM_RMT_STORAGE_CLIENT) += rmt_storage_client.o
 obj-$(CONFIG_MSM_RPM) += rpm.o rpm_resources.o
 obj-$(CONFIG_MSM_LPM_TEST) += test-lpm.o
 obj-$(CONFIG_MSM_RPM_SMD) += rpm-smd.o lpm_levels.o

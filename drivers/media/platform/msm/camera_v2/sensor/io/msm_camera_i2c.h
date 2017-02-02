@@ -42,7 +42,7 @@ struct msm_camera_i2c_fn_t {
 		(struct msm_camera_i2c_client *,
 		struct msm_camera_i2c_reg_setting *);
 	
-#ifdef CONFIG_IMX135
+#ifdef CONFIG_IMX214_APP
 	int32_t (*z7_i2c_write_seq_microdelay)
 		(struct msm_camera_i2c_client *,
 		struct msm_camera_i2c_reg_array *, uint16_t,
@@ -118,7 +118,7 @@ int32_t msm_camera_qup_i2c_write_seq_table(struct msm_camera_i2c_client *client,
 int32_t msm_camera_qup_i2c_write_table_w_microdelay(
 	struct msm_camera_i2c_client *client,
 	struct msm_camera_i2c_reg_setting *write_setting);
-#ifdef CONFIG_IMX135
+#ifdef CONFIG_IMX214_APP
 int32_t z7_msm_camera_cci_i2c_write_seq_microdelay(
 	struct msm_camera_i2c_client *client,
 	struct msm_camera_i2c_reg_array *reg_tbl, uint16_t size,

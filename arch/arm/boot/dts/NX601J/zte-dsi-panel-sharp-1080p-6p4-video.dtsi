@@ -40,23 +40,22 @@
 		qcom,mdss-dsi-bpp = <24>;
 		qcom,mdss-dsi-underflow-color = <0xff>;
 		qcom,mdss-dsi-border-color = <0>;
-		qcom,mdss-dsi-on-command = [23 01 00 00 00 00 02 b0 04
+		qcom,mdss-dsi-on-command = [
+					23 01 00 00 00 00 02 b0 04
 					05 01 00 00 00 00 02 00 00
 					05 01 00 00 00 00 02 00 00
 					23 01 00 00 00 00 02 d6 01
-					29 01 00 00 00 00 08
-						ce 00 01 88 c1 00
-						1e 04				
+					29 01 00 00 00 00 08 ce 00 01 88 c1 00 1e 04
 					];
 		qcom,mdss-dsi-on-second_command = [
 					39 01 00 00 00 00 02 55 01
 					39 01 00 00 00 00 02 53 2c
-					39 01 00 00 00 00 03 51 03 fc
 					39 01 00 00 00 00 02 29 00
-					39 01 00 00 a0 00 02 11 00
+					39 01 00 00 96 00 02 11 00
 					];
-		qcom,mdss-dsi-off-command = [39 01 00 00 20 00 02 28 00
-				 39 01 00 00 78 00 02 10 00];
+		qcom,mdss-dsi-off-command = [
+					39 01 00 00 20 00 02 28 00
+					39 01 00 00 78 00 02 10 00];
 		qcom,mdss-dsi-on-command-state = "dsi_lp_mode";
 		qcom,mdss-dsi-off-command-state = "dsi_hs_mode";
 		qcom,mdss-dsi-h-sync-pulse = <0>;
@@ -70,8 +69,14 @@
 		qcom,mdss-dsi-panel-timings = [cf 41 38 00 5e 51 3a 43 59 03 04 00];
 		qcom,mdss-dsi-t-clk-post = <0x04>;
 		qcom,mdss-dsi-t-clk-pre = <0x1C>;
-		qcom,mdss-dsi-bl-min-level = <1>;
-		qcom,mdss-dsi-bl-max-level = <255>;
+		qcom,mdss-brightness-max-level = <255>;
+		qcom,mdss-dsi-bl-min-level = <177>;
+		qcom,mdss-dsi-bl-max-level = <4095>;
+		qcom,mdss-dsi-bright-to-bl-lvl-para-a1 = <1635>;
+		qcom,mdss-dsi-bright-to-bl-lvl-para-a2 = <1388>;
+		qcom,mdss-dsi-bright-to-bl-lvl-para-b1 = <160>;
+		qcom,mdss-dsi-bright-to-bl-lvl-para-b2 = <55457>;
+		qcom,mdss-dsi-bright-to-bl-lvl-turn-point = <186>;
 		mdss-dsi-hfp-power-mode;
 		mdss-dsi-hsa-power-mode;
 		mdss-dsi-hbp-power-mode;
@@ -80,6 +85,6 @@
 		qcom,mdss-dsi-dma-trigger = "trigger_sw";
 		qcom,mdss-dsi-mdp-trigger = "none";
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-		qcom,mdss-dsi-reset-sequence = <0 55>, <1 12>;
+		qcom,mdss-dsi-reset-sequence = <0 50>, <1 10>;
 	};
 };

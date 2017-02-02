@@ -53,13 +53,35 @@ config BOARD_ZTEMT_NX507J
 config BOARD_ZTEMT_NX503A
 	bool "ZTEMT NX503A"
 	help
-	  Support for the ZTEMT NX503A board.	
+	  Support for the ZTEMT NX503A board.
+
+config BOARD_ZTEMT_NX514J
+	bool "ZTEMT NX514J"
+	help
+	  Support for the ZTEMT NX514J board.
+
+config BOARD_ZTEMT_NX515J
+	bool "ZTEMT NX515J"
+	help
+	  Support for the ZTEMT NX515J board.
+
+config BOARD_ZTEMT_NX516J
+	bool "ZTEMT NX516J"
+	help
+	  Support for the ZTEMT NX516J board.
 endchoice	
 
 config ZTEMT_RESTART
 	bool "ZTEMT restart"
 	help
 	  Support for the ZTEMT restart
+
+config ZTEMT_PANIC_BOOTMODE
+	bool "Enable panic bootmode if kernel panic"
+	help
+	  Select this option will enable feature of setting a 'panic' flag into
+          REBOOT_REASON_ADDR, thus the bootloader can detect the panic reboot reason
+          and append a boomode to cmdline.
 
 config EMMC_UNSUPPORTED_HPI
 	bool "ZTEMT emmc unsupported hpi feature"

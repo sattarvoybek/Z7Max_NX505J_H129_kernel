@@ -1530,11 +1530,11 @@ menuconfig ZTEMT_SENSORS_HALL_DEVICE
 if ZTEMT_SENSORS_HALL_DEVICE
 
 config ZTEMT_SENSORS_HALL_DEVICE_SIGNLE_OUT
-	tristate "signle out hell device driver"
+	tristate "single out hell device driver"
 	depends on ZTEMT_SENSORS_HALL_DEVICE
 	help
 	  If you say yes here you get support for zte's 
-	  signle out hell device
+	  single out hell device
 
 config ZTEMT_SENSORS_HALL_DEVICE_PAIR_OUT
 	tristate "pair out hell device driver"
@@ -1548,7 +1548,7 @@ endif
 endif
 ################################################# SENROS END
 
-# ZTEMT ADD by hongdanlong
+#ZTEMT ADD by ttwang
 config ZTEMT_LIQUID_LED
 	bool "ZTEMT liquid led"
 	default n
@@ -1562,9 +1562,6 @@ config ZTEMT_BREATH_LED_NX503A
 	help
 	  ZTEMT_BREATH_LED_NX503A
 #ZTEMT END 
-
-
-
 if ACPI
 
 comment "ACPI drivers"

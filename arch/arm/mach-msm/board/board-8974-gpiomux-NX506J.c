@@ -148,16 +148,12 @@ static struct gpiomux_setting gpio_eth_config = {
 	.func = GPIOMUX_FUNC_GPIO,
 };
 
-#ifdef CONFIG_ZTEMT_LCD_POWER_CONTRL
-/*avdd neg ctl by gpio8 board2 add ,mayu 6.25*/
-#else
-/*qcom ori*/
 static struct gpiomux_setting gpio_spi_cs2_config = {
 	.func = GPIOMUX_FUNC_4,
 	.drv = GPIOMUX_DRV_6MA,
 	.pull = GPIOMUX_PULL_DOWN,
 };
-#endif
+
 
 static struct gpiomux_setting gpio_spi_susp_config = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -165,16 +161,12 @@ static struct gpiomux_setting gpio_spi_susp_config = {
 	.pull = GPIOMUX_PULL_DOWN,
 };
 
-#ifdef CONFIG_ZTEMT_LCD_POWER_CONTRL
-/*avdd neg ctl by gpio8 board2 add ,mayu 6.25*/
-#else
-/*qcom ori*/
 static struct gpiomux_setting gpio_spi_cs1_config = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_6MA,
 	.pull = GPIOMUX_PULL_UP,
 };
-#endif
+
 static struct msm_gpiomux_config msm_eth_configs[] = {
 	{
 		.gpio = KS8851_IRQ_GPIO,
@@ -283,21 +275,7 @@ static struct gpiomux_setting lcd_en_sus_cfg = {
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_DOWN,
 };
-#ifdef CONFIG_ZTEMT_LCD_POWER_CONTRL
-/*avdd neg ctl board2 add ,mayu 6.25*/
-static struct gpiomux_setting lcd_avdd_neg_en_act_cfg = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_8MA,
-	.pull = GPIOMUX_PULL_NONE,
-	.dir = GPIOMUX_OUT_HIGH,
-};
 
-static struct gpiomux_setting lcd_avdd_neg_en_sus_cfg = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_DOWN,
-};
-#endif
 static struct gpiomux_setting atmel_resout_sus_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_6MA,
@@ -372,7 +350,6 @@ static struct msm_gpiomux_config msm_touch_configs[] __initdata = {
 	},
 
 };
-
 #ifdef CONFIG_PN547_NFC
 static struct msm_gpiomux_config msm_nxp_configs[] __initdata = {
 	{
@@ -449,26 +426,6 @@ static struct msm_gpiomux_config msm_nfc_configs[] __initdata = {
 
 };
 
-#endif
-
-#ifdef CONFIG_NFC_QNCI
-static struct msm_gpiomux_config msm_nfc_configs[] __initdata = {
-	{
-		.gpio      = 13,		/* qcom nfc_diable*/
-		.settings = {
-			[GPIOMUX_ACTIVE] = &atmel_resout_act_cfg,
-			[GPIOMUX_SUSPENDED] = &atmel_resout_sus_cfg,
-		},
-	},
-	{
-		.gpio      = 59,		/* qcom nfc_irq */
-		.settings = {
-			[GPIOMUX_ACTIVE] = &atmel_int_act_cfg,
-			[GPIOMUX_SUSPENDED] = &atmel_int_sus_cfg,
-		},
-	},
-
-};
 #endif
 
 static struct gpiomux_setting hsic_sus_cfg = {
@@ -568,47 +525,10 @@ static struct gpiomux_setting hdmi_active_2_cfg = {
 	.pull = GPIOMUX_PULL_DOWN,
 };
 
-#ifndef CONFIG_SII8620_MHL_TX
-/* ZTEMT Added by LiuYongfeng, 2013/8/9 */
-static struct gpiomux_setting slimport_suspend_config = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_UP,	
-};
-
-static struct gpiomux_setting slimport_active_1_cfg = {
-	.func = GPIOMUX_FUNC_GPIO,
-	.drv = GPIOMUX_DRV_2MA,
-	.pull = GPIOMUX_PULL_UP,
-	.dir = GPIOMUX_OUT_HIGH,
-};
-
-/*disable slimport ic by pull up the gpio anx7808 pwr, in order to enable the usb port while system bring up*/
-static struct msm_gpiomux_config msm_slimport_default_configs[] __initdata = {
-	{
-		/*slimport anx7808 en*/
-		.gpio = 14,
-		.settings = {
-			[GPIOMUX_SUSPENDED] = &slimport_suspend_config,
-			[GPIOMUX_ACTIVE]    = &slimport_active_1_cfg,
-		},
-
-	},
-	{
-		/* slimport-anx7808 pwr */
-		.gpio = 26,
-		.settings = {
-			[GPIOMUX_SUSPENDED] = &slimport_suspend_config,
-			[GPIOMUX_ACTIVE]    = &slimport_active_1_cfg,
-		},
-	},
-};
-/* ZTEMT END */
-#endif
 static struct msm_gpiomux_config msm_mhl_configs[] __initdata = {
 	{
 		/* mhl-sii8334 pwr */
-		.gpio = 12,
+		.gpio = 14,
 		.settings = {
 			[GPIOMUX_SUSPENDED] = &mhl_suspend_config,
 			[GPIOMUX_ACTIVE]    = &mhl_active_1_cfg,
@@ -616,7 +536,7 @@ static struct msm_gpiomux_config msm_mhl_configs[] __initdata = {
 	},
 	{
 		/* mhl-sii8334 intr */
-		.gpio = 82,
+		.gpio = 26,
 		.settings = {
 			[GPIOMUX_SUSPENDED] = &mhl_suspend_config,
 			[GPIOMUX_ACTIVE]    = &mhl_active_1_cfg,
@@ -722,16 +642,6 @@ static struct msm_gpiomux_config msm_lcd_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &lcd_en_sus_cfg,
 		},
 	},
-#ifdef CONFIG_ZTEMT_LCD_POWER_CONTRL
-/*avdd neg ctl board2 add ,mayu 6.25*/
-	{
-		.gpio = 8,
-		.settings = {
-			[GPIOMUX_ACTIVE]    = &lcd_avdd_neg_en_act_cfg ,
-			[GPIOMUX_SUSPENDED] = &lcd_avdd_neg_en_sus_cfg ,
-		},
-	},
-#endif
 };
 
 static struct msm_gpiomux_config msm_epm_configs[] __initdata = {
@@ -740,31 +650,29 @@ static struct msm_gpiomux_config msm_epm_configs[] __initdata = {
 		.settings = {
 			[GPIOMUX_SUSPENDED] = &gpio_epm_config,
 		},
+
 	},
-/*
-	{
-		.gpio      = 85,		// EPM MARKER2
-		.settings = {
-			[GPIOMUX_SUSPENDED] = &gpio_epm_marker_config,
-		},
-	},
-*/
-//Change by wuzehui
 	{
 		.gpio      = 96,		/* EPM MARKER1 */
 		.settings = {
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
 		},
 	},
-#if 0
+
+/*
 	{
-		.gpio      = 96,		/* EPM MARKER1 */
+		.gpio      = 85,		//EPM MARKER2 
 		.settings = {
 			[GPIOMUX_SUSPENDED] = &gpio_epm_marker_config,
 		},
 	},
-
-#endif
+	{
+		.gpio      = 96,		//EPM MARKER1
+		.settings = {
+			[GPIOMUX_SUSPENDED] = &gpio_epm_marker_config,
+		},
+	},
+*/
 };
 
 static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
@@ -784,7 +692,6 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 	},
 #endif
 /* ZTEMT END */
-
 #if defined(CONFIG_KS8851) || defined(CONFIG_KS8851_MODULE)
 	{
 		.gpio      = 0,		/* BLSP1 QUP SPI_DATA_MOSI */
@@ -800,10 +707,6 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_spi_susp_config,
 		},
 	},
-#ifdef CONFIG_ZTEMT_LCD_POWER_CONTRL
-/*avdd neg ctl by gpio8 board2 add ,mayu 6.25*/
-#else
-/*qcom ori*/
 	{
 		.gpio      = 3,		/* BLSP1 QUP SPI_CLK */
 		.settings = {
@@ -825,7 +728,6 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_spi_susp_config,
 		},
 	},
-#endif //CONFIG_ZTEMT_LCD_AVDD_NEGATIVE_CONTRL
 #endif
 	{
 		.gpio      = 6,		/* BLSP1 QUP2 I2C_DAT */
@@ -869,12 +771,18 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 		.gpio      = 29,		/* BLSP1 QUP6 I2C_DAT */
 		.settings = {
 			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
+		#ifdef CONFIG_ZTEMT_CHARGE_BQ24192
+			[GPIOMUX_ACTIVE] = &gpio_i2c_act_config,
+		#endif
 		},
 	},
 	{                           /* NFC */
 		.gpio      = 30,		/* BLSP1 QUP6 I2C_CLK */
 		.settings = {
 			[GPIOMUX_SUSPENDED] = &gpio_i2c_config,
+		#ifdef CONFIG_ZTEMT_CHARGE_BQ24192
+			[GPIOMUX_ACTIVE] = &gpio_i2c_act_config,
+		#endif
 		},
 	},
 	{
@@ -884,8 +792,6 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
 		},
 	},
-	#ifdef CONFIG_SWITCH_GPIO
-	#else
 	{
 		.gpio      = 54,		/* BLSP2 QUP4 SPI_DATA_MISO */
 		.settings = {
@@ -893,8 +799,7 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
 		},
 	},
-	#endif
-#ifndef CONFIG_TFA9890
+#ifndef CONFIG_SND_SOC_TFA9890
 	{
 		.gpio      = 56,		/* BLSP2 QUP4 SPI_CLK */
 		.settings = {
@@ -911,16 +816,13 @@ static struct msm_gpiomux_config msm_blsp_configs[] __initdata = {
 	},
 #endif
 };
-
-#ifdef CONFIG_TFA9890
-/*  
+#ifdef CONFIG_SND_SOC_TFA9890
 static struct gpiomux_setting tfa9890_reset_act = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_8MA,
 	.pull = GPIOMUX_PULL_NONE,
 	.dir = GPIOMUX_OUT_LOW,
 };
-*/
 
 static struct gpiomux_setting tfa9890_reset_sus = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -932,14 +834,14 @@ static struct gpiomux_setting tfa9890_reset_sus = {
 static struct gpiomux_setting tfa9890_int= {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_8MA,
-	.pull = GPIOMUX_PULL_NONE,
+	.pull = GPIOMUX_PULL_UP,
 	.dir = GPIOMUX_IN,
 };
 static struct msm_gpiomux_config tfa9890_gpio_config[] __initdata = {
 	{
 		.gpio      = 56,		/* tfa9890_reset */
 		.settings = {
-	//		[GPIOMUX_ACTIVE] = &tfa9890_reset_act,
+			[GPIOMUX_ACTIVE] = &tfa9890_reset_act,
 			[GPIOMUX_SUSPENDED] = &tfa9890_reset_sus,
 		},
 	},
@@ -1100,7 +1002,6 @@ static struct msm_gpiomux_config msm_sensor_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
 		},
 	},
-	#ifndef CONFIG_SII8620_MHL_TX
 	{
 		.gpio = 26, /* CAM_IRQ */
 		.settings = {
@@ -1115,7 +1016,6 @@ static struct msm_gpiomux_config msm_sensor_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
 		},
 	},
-	#endif
 	{
 		.gpio = 28, /* WEBCAM1_STANDBY */
 		.settings = {
@@ -1254,7 +1154,6 @@ static struct msm_gpiomux_config msm_sensor_configs_dragonboard[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
 		},
 	},
-	#ifndef CONFIG_SII8620_MHL_TX
 	{
 		.gpio = 26, /* CAM_IRQ */
 		.settings = {
@@ -1269,7 +1168,6 @@ static struct msm_gpiomux_config msm_sensor_configs_dragonboard[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
 		},
 	},
-	#endif
 	{
 		.gpio = 28, /* WEBCAM1_STANDBY */
 		.settings = {
@@ -1692,26 +1590,6 @@ static void msm_gpiomux_sdc4_install(void)
 static void msm_gpiomux_sdc4_install(void) {}
 #endif /* CONFIG_MMC_MSM_SDC4_SUPPORT */
 
-#ifdef CONFIG_SII8620_MHL_TX  //mhl use i2c 1
-static struct msm_gpiomux_config apq8974_i2c1_config[] __initdata = {
-	   {
-	       /* BLSP1 QUP I2C_DATA */
-	       .gpio      = 2,
-	       .settings = {
-	           [GPIOMUX_SUSPENDED] = &gpio_i2c_config,
-	           [GPIOMUX_ACTIVE] = &gpio_i2c_config,//added, i2c need active config
-	       },
-	   },
-	   {
-	       /* BLSP1 QUP I2C_CLK */
-	       .gpio      = 3,
-	       .settings = {
-	           [GPIOMUX_SUSPENDED] = &gpio_i2c_config,
-	           [GPIOMUX_ACTIVE] = &gpio_i2c_config,//added, i2c need active config
-	       },
-	   },
-	};
-#else
 static struct msm_gpiomux_config apq8074_dragonboard_ts_config[] __initdata = {
 	{
 		/* BLSP1 QUP I2C_DATA */
@@ -1728,7 +1606,7 @@ static struct msm_gpiomux_config apq8074_dragonboard_ts_config[] __initdata = {
 		},
 	},
 };
-#endif
+
 void __init msm_8974_init_gpiomux(void)
 {
 	int rc;
@@ -1770,20 +1648,13 @@ void __init msm_8974_init_gpiomux(void)
 	else
 		msm_gpiomux_install(msm_sensor_configs, \
 				ARRAY_SIZE(msm_sensor_configs));
-
 #ifdef CONFIG_PN547_NFC
 	msm_gpiomux_install(msm_nxp_configs, ARRAY_SIZE(msm_nxp_configs));
 #endif
 #ifdef CONFIG_BCM2079X_I2C
 	msm_gpiomux_install(msm_nfc_configs, ARRAY_SIZE(msm_nfc_configs));
-#endif //for qcom nfc
-#ifdef CONFIG_NFC_QNCI
-	msm_gpiomux_install(msm_nfc_configs, ARRAY_SIZE(msm_nfc_configs));
-#endif
+#endif //for brcm nfc
 
-#ifdef CONFIG_SII8620_MHL_TX
-	msm_gpiomux_install(apq8974_i2c1_config, ARRAY_SIZE(apq8974_i2c1_config));//mhl use i2c1
-#endif
 	msm_gpiomux_install(&sd_card_det, 1);
 
 	if (machine_is_apq8074() && (of_board_is_liquid() || \
@@ -1799,17 +1670,11 @@ void __init msm_8974_init_gpiomux(void)
 	msm_gpiomux_install(msm_hsic_hub_configs,
 				ARRAY_SIZE(msm_hsic_hub_configs));
 
-/* ZTEMT Added by LiuYongfeng, 2013/8/9 disable simport chip in order to enable usb connect*/
-#ifndef CONFIG_SII8620_MHL_TX
-	msm_gpiomux_install(msm_slimport_default_configs, 
-				ARRAY_SIZE(msm_slimport_default_configs));
-#endif
-/* ZTEMT END */
-#ifdef CONFIG_TFA9890
+#ifdef CONFIG_SND_SOC_TFA9890
     msm_gpiomux_install(tfa9890_gpio_config,ARRAY_SIZE(tfa9890_gpio_config));
 #endif
 	msm_gpiomux_install(msm_hdmi_configs, ARRAY_SIZE(msm_hdmi_configs));
-	if (of_board_is_fluid())
+//	if (of_board_is_fluid())
 		msm_gpiomux_install(msm_mhl_configs,
 				    ARRAY_SIZE(msm_mhl_configs));
 
@@ -1840,11 +1705,9 @@ void __init msm_8974_init_gpiomux(void)
 		msm_gpiomux_install(mdm_configs,
 			ARRAY_SIZE(mdm_configs));
 
-#ifndef CONFIG_SII8620_MHL_TX
 	if (of_board_is_dragonboard() && machine_is_apq8074())
 		msm_gpiomux_install(apq8074_dragonboard_ts_config,
 			ARRAY_SIZE(apq8074_dragonboard_ts_config));
-#endif
 }
 
 static void wcnss_switch_to_gpio(void)

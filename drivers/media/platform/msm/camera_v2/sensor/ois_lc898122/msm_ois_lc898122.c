@@ -106,6 +106,29 @@ void read_ois_word_data_lc898122(unsigned short reg_addr, uint16_t *read_data_16
 		
 };
 
+
+void imx214_gbao_read_ois_byte_data_lc898122(unsigned short reg_addr, unsigned char *read_data_8)
+{
+        int32_t rc=0;
+        uint16_t temp_data;
+        msm_ois_lc898122_t.i2c_client.cci_client->sid = 0xA8>>1;
+ 	 msm_ois_lc898122_t.i2c_client.addr_type = MSM_CAMERA_I2C_BYTE_ADDR;
+	 msm_ois_lc898122_t.i2c_data_type = MSM_OIS_BYTE_DATA;
+	 rc =  msm_ois_lc898122_t.i2c_client.i2c_func_tbl->i2c_read
+	 (
+		&msm_ois_lc898122_t.i2c_client,
+		reg_addr, &temp_data,
+		msm_ois_lc898122_t.i2c_data_type);
+
+	 if (rc < 0) {
+		pr_err("%s: line %d rc = %d\n", __func__, __LINE__, rc);
+	 }
+
+	 *read_data_8 = (unsigned char)temp_data;
+		
+};
+
+
 void RegReadA_lc898122(unsigned short reg_addr, unsigned char *read_data_8)
 {
         int32_t rc=0;
@@ -236,6 +259,8 @@ EXPORT_SYMBOL(RamReadA_lc898122);
 EXPORT_SYMBOL(RamWriteA_lc898122);
 EXPORT_SYMBOL(RamRead32A_lc898122);
 EXPORT_SYMBOL(RamWrite32A_lc898122);
+EXPORT_SYMBOL(imx214_gbao_read_ois_byte_data_lc898122);
+
 
 void msm_af_init_cci_lc898122(void)
 {

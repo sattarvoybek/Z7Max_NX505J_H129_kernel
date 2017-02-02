@@ -283,11 +283,7 @@ struct usb_composite_driver {
 	const char				*name;
 	const char				*iProduct;
 	const char				*iManufacturer;
-#ifdef CONFIG_ZTEMT_USB
-	struct usb_device_descriptor		*dev;
-#else
 	const struct usb_device_descriptor	*dev;
-#endif
 	struct usb_gadget_strings		**strings;
 	enum usb_device_speed			max_speed;
 	unsigned		needs_serial:1;

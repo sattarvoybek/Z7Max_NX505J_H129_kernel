@@ -27,11 +27,20 @@ DEFINE_MSM_MUTEX(msm_actuator_mutex);
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 #endif
 
-#if defined(CONFIG_ZTE_CAMERA_NX505J) || defined(CONFIG_ZTE_CAMERA_NX507J)
+#if defined(CONFIG_ZTE_CAMERA_NX505J) || defined(CONFIG_ZTE_CAMERA_NX507J) || defined(CONFIG_ZTE_CAMERA_NX504J)
 extern unsigned short af_infinity_value_imx214;
 extern unsigned short af_macro_value_imx214;
 #define IMX214_MIN_INITIAL_CODE 30
 #define IMX214_AF_OFFSET 68
+#endif
+
+#if defined(CONFIG_IMX214_OIS_SHARP) || defined(CONFIG_IMX135_GBAO_LC898122)
+unsigned short af_start_value_lc898122 = 0;
+unsigned short af_infinity_value_lc898122 = 0;
+unsigned short af_macro_value_lc898122 = 0;
+unsigned short af_start_value_lc898122_sharp = 0;
+unsigned short af_infinity_value_lc898122_sharp = 0;
+unsigned short af_macro_value_lc898122_sharp = 0;
 #endif
 
 /*ZTEMT: Jinghongliang Add for Read AF OTP  ---Start*/
@@ -42,10 +51,39 @@ extern unsigned short af_macro_value;
 #endif
 /*ZTEMT: Jinghongliang Add for Read AF OTP  ---End*/
 
-#ifdef CONFIG_IMX135
+#ifdef CONFIG_IMX214_APP
 void RegRead8byte(uint16_t reg_addr, struct msm_actuator_ctrl_t *a_ctrl);
 int32_t Regwrite8byte(uint16_t reg_addr, unsigned long write_data1_32, \
 	unsigned long write_data2_32, struct msm_actuator_ctrl_t *a_ctrl);
+extern int ofei_720p_120fps_flag;
+int32_t OfeiRegwrite8byte(uint16_t reg_addr, unsigned long write_data1_32
+	, unsigned long write_data2_32);
+
+void ofei_swtich_to_preview_mode(void)
+{
+    OfeiRegwrite8byte(0x20, 0x08010101, 0x90050000);//480k PWM frequence
+}
+
+void ofei_swtich_to_snapshot_mode(void)
+{
+    OfeiRegwrite8byte(0x20, 0x08010101, 0x54030000);//564.7k PWM frequence
+}
+
+
+void ofei_swtich_to_720p_120fps_mode(void)
+{
+    OfeiRegwrite8byte(0x20, 0x08010101, 0x54030000);//564.7kk PWM frequence
+}
+
+void ofei_swtich_to_720p_120fps_mode_new(void)
+{
+    OfeiRegwrite8byte(0x20, 0x08010101, 0x54030000);//564.7k PWM frequence
+}
+void ofei_swtich_to_slow_shutter_mode(void)
+{
+    OfeiRegwrite8byte(0x20, 0x08010101, 0x90050000);//480k PWM frequence
+}
+
 #endif
 static struct msm_actuator msm_vcm_actuator_table;
 static struct msm_actuator msm_piezo_actuator_table;
@@ -87,7 +125,6 @@ static int32_t msm_actuator_piezo_set_default_focus(
 	CDBG("Exit\n");
 	return rc;
 }
-
 static void msm_actuator_parse_i2c_params(struct msm_actuator_ctrl_t *a_ctrl,
 	int16_t next_lens_position, uint32_t hw_params, uint16_t delay)
 {
@@ -150,8 +187,19 @@ static void msm_actuator_parse_i2c_params(struct msm_actuator_ctrl_t *a_ctrl,
 			{
                             i2c_byte1 = ((value & 0x0700) >> 8)|0x04;
 				i2c_byte2 = value & 0xFF;
-				//printk(" af i2c_byte1 = 0x%x\n",i2c_byte1);
-			       //printk(" af i2c_byte2 = 0x%x\n",i2c_byte2);
+				//printk("af i2c_byte1 = 0x%x\n",i2c_byte1);
+			       //printk("af i2c_byte2 = 0x%x\n",i2c_byte2);
+			}else{
+				i2c_byte1 = (value & 0xFF00) >> 8;
+				i2c_byte2 = value & 0xFF;
+			}
+#elif defined(CONFIG_IMX214_LC898122) || defined(CONFIG_IMX214_OIS_SHARP)
+                     if (a_ctrl->i2c_client.cci_client->sid == 0x48 >> 1) 
+			{
+                            i2c_byte1 = ((value & 0x0700) >> 8)|0x04;
+				i2c_byte2 = value & 0xFF;
+				//printk("  af i2c_byte1 = 0x%x\n",i2c_byte1);
+			       //printk("  af i2c_byte2 = 0x%x\n",i2c_byte2);
 			}else{
 				i2c_byte1 = (value & 0xFF00) >> 8;
 				i2c_byte2 = value & 0xFF;
@@ -182,15 +230,26 @@ static int32_t msm_actuator_init_focus(struct msm_actuator_ctrl_t *a_ctrl,
 	int32_t rc = -EFAULT;
 	int32_t i = 0;
 	CDBG("Enter\n");
-#if defined(CONFIG_IMX135) || defined(CONFIG_IMX135_GBAO_LC898122)
+#if defined(CONFIG_IMX214_APP) || defined(CONFIG_IMX135_GBAO_LC898122)|| defined(CONFIG_IMX214_OIS_SHARP)|| defined(CONFIG_IMX214_LC898122)
 	
-#ifdef CONFIG_IMX135
+#ifdef CONFIG_IMX214_APP
 	i = 0;
 	if ((a_ctrl->act_device_type == MSM_CAMERA_PLATFORM_DEVICE) && \
 		(a_ctrl->i2c_client.cci_client->sid == 0x32 >> 1)) {
 		//RegRead8byte(0x91, a_ctrl);
-		//rc = Regwrite8byte(0x20, 0x08010103, 0x20000000, a_ctrl);
-		rc = Regwrite8byte(0x20, 0x08010101, 0x90050000, a_ctrl);
+		printk("k_debug enter msm_actuator_init_focus CONFIG_IMX214_APP ofei_flag=%x\n ",ofei_720p_120fps_flag);
+		//rc = Regwrite8byte(0x20, 0x08010103, 0x20060000, a_ctrl);
+		//rc = Regwrite8byte(0x20, 0x08010101, 0x90050000, a_ctrl);
+		if (ofei_720p_120fps_flag == 0)
+			ofei_swtich_to_preview_mode();
+	    if (ofei_720p_120fps_flag == 1)
+			ofei_swtich_to_720p_120fps_mode();
+		if (ofei_720p_120fps_flag == 0xa0)
+			ofei_swtich_to_snapshot_mode();
+        if (ofei_720p_120fps_flag == 0xa4)
+			ofei_swtich_to_720p_120fps_mode_new();
+		if (ofei_720p_120fps_flag == 0xa6)
+			ofei_swtich_to_slow_shutter_mode();
 		msleep(100);
 		rc = Regwrite8byte(0x15, 0x00640000, 0x00000000, a_ctrl);
 		//rc = Regwrite8byte(0x01, 0x03000000, 0x00000000, a_ctrl);
@@ -205,6 +264,23 @@ static int32_t msm_actuator_init_focus(struct msm_actuator_ctrl_t *a_ctrl,
                //printk(" goto init gbao lc898122 focus\n");
 	}
 #endif
+#ifdef CONFIG_IMX214_OIS_SHARP
+	i = 0;
+	if ((a_ctrl->act_device_type == MSM_CAMERA_PLATFORM_DEVICE) && \
+		(a_ctrl->i2c_client.cci_client->sid == 0x48 >> 1)) {
+		 rc = 0;
+               //printk(" goto init gbao lc898122 focus\n");
+	}
+#endif
+#ifdef CONFIG_IMX214_LC898122
+	i = 0;
+	if ((a_ctrl->act_device_type == MSM_CAMERA_PLATFORM_DEVICE) && \
+		(a_ctrl->i2c_client.cci_client->sid == 0x48 >> 1)) {
+		 rc = 0;
+               //printk(" goto init gbao lc898122 focus\n");
+	}
+#endif
+
 	if ((a_ctrl->i2c_client.cci_client->sid != 0x32 >> 1) && (a_ctrl->i2c_client.cci_client->sid != 0x48 >> 1)) {
 		for (i = 0; i < size; i++) {
 			switch (type) {
@@ -333,14 +409,23 @@ static int32_t msm_actuator_piezo_move_focus(
 	CDBG("Exit\n");
 	return rc;
 }
-#ifdef CONFIG_IMX135_GBAO_LC898122
+#if defined(CONFIG_IMX135_GBAO_LC898122)
 extern void msm_af_reg_write_lc898122(unsigned short reg_addr, unsigned char write_data_8);
 extern void msm_ois_init_cci_lc898122(void);
 extern void msm_ois_release_cci_lc898122(void);
-extern unsigned short af_start_value_lc898122;
-extern unsigned short af_infinity_value_lc898122;
-extern unsigned short af_macro_value_lc898122 ;
 #endif
+
+#if defined(CONFIG_IMX214_LC898122)||defined(CONFIG_IMX214_OIS_SHARP)
+extern void msm_af_reg_write_lc898122(unsigned short reg_addr, unsigned char write_data_8);
+#endif
+
+#if defined(CONFIG_IMX214_OIS_SHARP)
+//extern void msm_af_reg_write_lc898122_sharp(unsigned short reg_addr, unsigned char write_data_8);
+//extern void	SetTregAf_lc898122_sharp( unsigned short UsTregAf );
+extern void msm_ois_init_cci_lc898122_sharp(void);
+extern void msm_ois_release_cci_lc898122_sharp(void);
+#endif
+
 static int32_t msm_actuator_move_focus(
 	struct msm_actuator_ctrl_t *a_ctrl,
 	struct msm_actuator_move_params_t *move_params)
@@ -356,7 +441,7 @@ static int32_t msm_actuator_move_focus(
 	int dir = move_params->dir;
 	int32_t num_steps = move_params->num_steps;
 	struct msm_camera_i2c_reg_setting reg_setting;
-
+	
 	curr_lens_pos = a_ctrl->step_position_table[a_ctrl->curr_step_pos];
 	move_params->curr_lens_pos = curr_lens_pos;
 
@@ -372,12 +457,34 @@ static int32_t msm_actuator_move_focus(
 
 	if (dest_step_pos == a_ctrl->curr_step_pos)
 		return rc;
-
-	a_ctrl->i2c_tbl_index = 0;
+	
+	if ((sign_dir > MSM_ACTUATOR_MOVE_SIGNED_NEAR) ||
+		(sign_dir < MSM_ACTUATOR_MOVE_SIGNED_FAR)) {
+		pr_err("%s:%d Invalid sign_dir = %d\n",
+		__func__, __LINE__, sign_dir);
+		return -EFAULT;
+	}
+	if ((dir > MOVE_FAR) || (dir < MOVE_NEAR)) {
+		pr_err("%s:%d Invalid direction = %d\n",
+		__func__, __LINE__, dir);
+		return -EFAULT;
+	}
+	if (dest_step_pos > a_ctrl->total_steps) {
+		pr_err("Step pos greater than total steps = %d\n",
+		dest_step_pos);
+		return -EFAULT;
+	}
+	curr_lens_pos = a_ctrl->step_position_table[a_ctrl->curr_step_pos];
+//comment by congshan start
+	//a_ctrl->i2c_tbl_index = 0;
+//comment by congshan end¢˜
 	CDBG("curr_step_pos =%d dest_step_pos =%d curr_lens_pos=%d\n",
 		a_ctrl->curr_step_pos, dest_step_pos, curr_lens_pos);
 
 	while (a_ctrl->curr_step_pos != dest_step_pos) {
+		//added  by congshan start
+		a_ctrl->i2c_tbl_index = 0;
+		//added by congshan end
 		step_boundary =
 			a_ctrl->region_params[a_ctrl->curr_region_index].
 			step_bound[dir];
@@ -414,16 +521,19 @@ static int32_t msm_actuator_move_focus(
 	reg_setting.reg_setting = a_ctrl->i2c_reg_tbl;
 	reg_setting.data_type = a_ctrl->i2c_data_type;
 	reg_setting.size = a_ctrl->i2c_tbl_index;
-#if defined(CONFIG_IMX135_GBAO_LC898122) || defined(CONFIG_IMX135)
+#if defined(CONFIG_IMX135_GBAO_LC898122) || defined(CONFIG_IMX214_APP)|| defined(CONFIG_IMX214_OIS_SHARP)|| defined(CONFIG_IMX214_LC898122)
 
-#ifdef CONFIG_IMX135_GBAO_LC898122
+#if defined(CONFIG_IMX214_LC898122)|| defined(CONFIG_IMX214_OIS_SHARP)|| defined(CONFIG_IMX135_GBAO_LC898122)
 	if (a_ctrl->i2c_client.cci_client->sid == 0x48 >> 1) {	
 		msm_af_reg_write_lc898122(0x0304,a_ctrl->i2c_reg_tbl->reg_addr);
 		msm_af_reg_write_lc898122(0x0305,a_ctrl->i2c_reg_tbl->reg_data);
-		//printk("reg_addr =0x%x,reg_data =0x%x\n",a_ctrl->i2c_reg_tbl->reg_addr,a_ctrl->i2c_reg_tbl->reg_data);
+		//printk(" reg_addr =0x%x,reg_data =0x%x\n",a_ctrl->i2c_reg_tbl->reg_addr,a_ctrl->i2c_reg_tbl->reg_data);
+		
 	}
 #endif
-#ifdef CONFIG_IMX135
+
+
+#ifdef CONFIG_IMX214_APP
 	if (a_ctrl->i2c_client.cci_client->sid == 0x32 >> 1) {
 		rc = a_ctrl->i2c_client.i2c_func_tbl->z7_i2c_write_seq_microdelay(
 			&a_ctrl->i2c_client,
@@ -472,6 +582,12 @@ static int32_t msm_actuator_init_step_table(struct msm_actuator_ctrl_t *a_ctrl,
 	kfree(a_ctrl->step_position_table);
 	a_ctrl->step_position_table = NULL;
 
+	if (set_info->af_tuning_params.total_steps
+		>  MAX_ACTUATOR_AF_TOTAL_STEPS) {
+		pr_err("%s: Max actuator totalsteps exceeded = %d\n",
+		__func__, set_info->af_tuning_params.total_steps);
+		return -EFAULT;
+	}
 	/* Fill step position table */
 	a_ctrl->step_position_table =
 		kmalloc(sizeof(uint16_t) *
@@ -479,7 +595,7 @@ static int32_t msm_actuator_init_step_table(struct msm_actuator_ctrl_t *a_ctrl,
 
 	if (a_ctrl->step_position_table == NULL)
 		return -ENOMEM;
-#if defined(CONFIG_IMX135_GBAO) || defined(CONFIG_IMX135_GBAO_LC898122) || defined(CONFIG_IMX135_Z5S)
+#if defined(CONFIG_IMX135_GBAO) || defined(CONFIG_IMX135_GBAO_LC898122) || defined(CONFIG_IMX135_Z5S)|| defined(CONFIG_IMX214_OIS_SHARP) 
 
 	/*ZTEMT: Jinghongliang Add for Read AF OTP	---Start*/
 #if defined(CONFIG_IMX135_GBAO)  || defined(CONFIG_IMX135_Z5S)
@@ -496,13 +612,17 @@ static int32_t msm_actuator_init_step_table(struct msm_actuator_ctrl_t *a_ctrl,
 			step_boundary =a_ctrl->region_params[region_index].step_bound[MOVE_NEAR];
 			if(region_index == 0){
 				code_per_step = (af_infinity_value - af_start_value)/step_boundary;
+				code_per_step = 1;
 				//printk("code_per_step_1 = %d\n",code_per_step);
 				}
 			if(region_index == 1){
+				#if 0
 				code_per_step = (af_macro_value - af_infinity_value)*10;
 				code_per_step = code_per_step/40;
 				//printk("code_per_step_211 = %d\n",code_per_step);
 				code_per_step = (code_per_step + 5)/10;
+				#endif
+				code_per_step = 1;
 				//printk("code_per_step_222 = %d\n",code_per_step);
 				}
 			for (; step_index <= step_boundary;step_index++) {
@@ -559,12 +679,16 @@ static int32_t msm_actuator_init_step_table(struct msm_actuator_ctrl_t *a_ctrl,
 
 	if((set_info->actuator_params.i2c_addr == 0x48) && af_infinity_value_lc898122 > 0 \
 		&& af_start_value_lc898122 > 0 && af_macro_value_lc898122 > 0){
-		cur_code = af_start_value_lc898122;
+		cur_code = af_start_value_lc898122*2/3;
+		if (cur_code >= af_infinity_value_lc898122)
+				cur_code = af_infinity_value_lc898122*39/50;
 		a_ctrl->step_position_table[step_index++] = cur_code;
 		for (region_index = 0;region_index < a_ctrl->region_size;region_index++) {
 			step_boundary =a_ctrl->region_params[region_index].step_bound[MOVE_NEAR];
 			if(region_index == 0){
 				code_per_step = (af_infinity_value_lc898122 - cur_code)/step_boundary;
+				
+				code_per_step = 1;
 				//printk(" code_per_step_1 = %d\n",code_per_step);
 				}
 			if(region_index == 1){
@@ -572,6 +696,8 @@ static int32_t msm_actuator_init_step_table(struct msm_actuator_ctrl_t *a_ctrl,
 				code_per_step = code_per_step/40;
 				//printk(" code_per_step_211 = %d\n",code_per_step);
 				code_per_step = (code_per_step + 5)/10;
+				
+				code_per_step = 1;
 				//printk(" code_per_step_222 = %d\n",code_per_step);
 				}
 			for (; step_index <= step_boundary;step_index++) {
@@ -591,7 +717,8 @@ static int32_t msm_actuator_init_step_table(struct msm_actuator_ctrl_t *a_ctrl,
 			}
 		}
 	}
-	if ((set_info->actuator_params.i2c_addr == 0x48)&&((af_infinity_value_lc898122 == 0) || (af_macro_value_lc898122 == 0))) {
+	if ((set_info->actuator_params.i2c_addr == 0x48)&&((af_infinity_value_lc898122 == 0) || (af_macro_value_lc898122 == 0) || (af_start_value_lc898122 == 0)) \
+		    && ((af_infinity_value_lc898122_sharp == 0) || (af_macro_value_lc898122_sharp == 0)|| (af_start_value_lc898122_sharp == 0))) {
 		cur_code = set_info->af_tuning_params.initial_code;
 		a_ctrl->step_position_table[step_index++] = cur_code;
 		for (region_index = 0;
@@ -621,6 +748,107 @@ static int32_t msm_actuator_init_step_table(struct msm_actuator_ctrl_t *a_ctrl,
 		}
 	}
 #endif
+#ifdef CONFIG_IMX214_OIS_SHARP
+	printk(" af_start_value_lc898122_sharp = %d\n",af_start_value_lc898122_sharp);
+	printk(" af_infinity_value_lc898122_sharp = %d\n",af_infinity_value_lc898122_sharp);
+	printk(" af_macro_value_lc898122_sharp = %d\n",af_macro_value_lc898122_sharp);
+
+	if((set_info->actuator_params.i2c_addr == 0x48) && af_infinity_value_lc898122_sharp > 0 \
+		&& af_start_value_lc898122_sharp > 0 && af_macro_value_lc898122_sharp > 0){
+
+		int16_t total_code = 0;
+		int16_t adjust_code = 0;
+		int16_t offset_code = 0;
+		cur_code = af_start_value_lc898122_sharp - 40;
+		a_ctrl->step_position_table[step_index++] = cur_code;
+		for (region_index = 0;region_index < a_ctrl->region_size;region_index++) {
+			step_boundary =a_ctrl->region_params[region_index].step_bound[MOVE_NEAR];
+			if(region_index == 0){
+				code_per_step = (af_infinity_value_lc898122_sharp - cur_code)/step_boundary;
+				//printk(" code_per_step_1 = %d\n",code_per_step);
+				}
+			if(region_index == 1){
+				code_per_step = (af_macro_value_lc898122_sharp - af_infinity_value_lc898122_sharp)*10;
+				code_per_step = code_per_step/40;
+				code_per_step = (code_per_step + 5)/10;
+				//ZTEMT:jixd af opt code optimization begin
+				total_code = (af_macro_value_lc898122_sharp - af_infinity_value_lc898122_sharp)*
+					(a_ctrl->region_params[1].step_bound[MOVE_NEAR]-a_ctrl->region_params[0].step_bound[MOVE_NEAR])/40;
+				adjust_code = code_per_step*(a_ctrl->region_params[1].step_bound[MOVE_NEAR]-a_ctrl->region_params[0].step_bound[MOVE_NEAR]);
+				offset_code = total_code - adjust_code;
+				printk(" jxdadd_0102,code_per_step_222 = %d,%d,%d,%d\n",code_per_step,total_code,adjust_code,offset_code);
+				//ZTEMT:jixd af opt code optimization end
+
+			}
+			for (; step_index <= step_boundary;step_index++) {
+
+				//ZTEMT:jixd af opt code optimization begin
+				if((region_index == 1)&&(offset_code > 0)
+					 &&(step_index > a_ctrl->region_params[1].step_bound[MOVE_NEAR] - offset_code))
+			    {
+					cur_code = cur_code + code_per_step + 1;
+			    }
+				else if((region_index == 1)&&(offset_code < 0) 
+					&&(step_index <= a_ctrl->region_params[0].step_bound[MOVE_NEAR] - offset_code))
+				{
+					cur_code = cur_code + code_per_step - 1;
+				}
+				else
+				{
+					cur_code += code_per_step;
+				}
+				printk(" jxdadd_0102_2,index = %d,code=%d\n",step_index,cur_code);
+				//ZTEMT:jixd af opt code optimization end
+
+
+				if (cur_code < max_code_size){
+					a_ctrl->step_position_table[step_index] =
+						cur_code;
+			    }
+			    else {
+					for (; step_index <
+						set_info->af_tuning_params.total_steps;
+						step_index++)
+						a_ctrl->
+							step_position_table[
+							step_index] =
+							max_code_size;
+				}
+			}
+		}
+	}
+	if ((set_info->actuator_params.i2c_addr == 0x48)&&((af_infinity_value_lc898122_sharp == 0) || (af_macro_value_lc898122_sharp == 0)|| (af_start_value_lc898122_sharp == 0)) \
+		 && ((af_infinity_value_lc898122 == 0) || (af_macro_value_lc898122 == 0) || (af_start_value_lc898122 == 0))) {
+		cur_code = set_info->af_tuning_params.initial_code;
+		a_ctrl->step_position_table[step_index++] = cur_code;
+		for (region_index = 0;
+			region_index < a_ctrl->region_size;
+			region_index++) {
+			code_per_step =
+				a_ctrl->region_params[region_index].code_per_step;
+			step_boundary =
+				a_ctrl->region_params[region_index].
+				step_bound[MOVE_NEAR];
+			for (; step_index <= step_boundary;
+				step_index++) {
+				cur_code += code_per_step;
+				if (cur_code < max_code_size)
+					a_ctrl->step_position_table[step_index] =
+						cur_code;
+				else {
+					for (; step_index <
+						set_info->af_tuning_params.total_steps;
+						step_index++)
+						a_ctrl->
+							step_position_table[
+							step_index] =
+							max_code_size;
+				}
+			}
+		}
+	}
+#endif
+
 	if ((set_info->actuator_params.i2c_addr != 0x1c) && (set_info->actuator_params.i2c_addr != 0x48)) {
 		cur_code = set_info->af_tuning_params.initial_code;
 		a_ctrl->step_position_table[step_index++] = cur_code;
@@ -652,13 +880,13 @@ static int32_t msm_actuator_init_step_table(struct msm_actuator_ctrl_t *a_ctrl,
 	}
 #else
 	cur_code = set_info->af_tuning_params.initial_code;
-#if defined(CONFIG_ZTE_CAMERA_NX505J) || defined(CONFIG_ZTE_CAMERA_NX507J)
-	if(af_infinity_value_imx214 > 99 && af_infinity_value_imx214 < 401){
-	cur_code = af_infinity_value_imx214 - IMX214_AF_OFFSET;
-	if(cur_code < IMX214_MIN_INITIAL_CODE)
-		cur_code = IMX214_MIN_INITIAL_CODE;
-	}
-#endif
+    #if defined(CONFIG_ZTE_CAMERA_NX505J) || defined(CONFIG_ZTE_CAMERA_NX507J)|| defined(CONFIG_ZTE_CAMERA_NX504J)
+		if(af_infinity_value_imx214 > 99 && af_infinity_value_imx214 < 401){
+		cur_code = af_infinity_value_imx214 - IMX214_AF_OFFSET;
+		if(cur_code < IMX214_MIN_INITIAL_CODE)
+			cur_code = IMX214_MIN_INITIAL_CODE;
+		}
+    #endif
 	a_ctrl->step_position_table[step_index++] = cur_code;
 	for (region_index = 0;
 		region_index < a_ctrl->region_size;
@@ -714,9 +942,19 @@ static int32_t msm_actuator_set_default_focus(
 		}
 	pr_err("%s[jun]Exit\n",__func__);
 	#else
-	pr_err("%s]Enter, ,cur_step_pos=%d,move_params->curr_lens_pos=%d,move_params->dest_step_pos=%d \n",__func__,a_ctrl->curr_step_pos,move_params->curr_lens_pos,move_params->dest_step_pos);
+
 	if (a_ctrl->curr_step_pos != 0)
-		rc = a_ctrl->func_tbl->actuator_move_focus(a_ctrl, move_params);
+	    rc = a_ctrl->func_tbl->actuator_move_focus(a_ctrl, move_params);
+
+	//ZTEMT:jixd for lc898122 begin
+	#ifdef CONFIG_IMX214_OIS_SHARP
+	else
+	{
+	    msm_af_reg_write_lc898122(0x0304,0x07&(a_ctrl->step_position_table[0]>>8));
+	    msm_af_reg_write_lc898122(0x0305,a_ctrl->step_position_table[0]&0xff);
+	}
+	#endif /*CONFIG_IMX214_OIS_SHARP*/
+	//ZTEMT:jixd for lc898122 end
 	#endif
 	
 	CDBG("Exit\n");
@@ -743,6 +981,13 @@ static int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl)
 		msm_ois_release_cci_lc898122();
 	}
 	#endif
+	
+	#ifdef CONFIG_IMX214_OIS_SHARP
+	if (a_ctrl->i2c_client.cci_client->sid == 0x48 >> 1) {	
+		msm_ois_release_cci_lc898122_sharp();
+	}
+	#endif
+
 	CDBG("Exit\n");
 	return rc;
 }
@@ -755,13 +1000,17 @@ static int32_t msm_actuator_set_position(
 	int32_t index;
 	uint16_t next_lens_position;
 	uint16_t delay;
-	#if defined(CONFIG_ZTE_CAMERA_NX505J) || defined(CONFIG_ZTE_CAMERA_NX507J)
-	uint32_t hw_params = 0xF400;
-	uint16_t value=0;
-	#else
-	uint32_t hw_params = 0;
-	#endif
-	
+	#if defined(CONFIG_ZTE_CAMERA_NX505J) || defined(CONFIG_ZTE_CAMERA_NX507J) || defined(CONFIG_ZTE_CAMERA_NX504J)
+    uint32_t hw_params = 0xF400;
+    uint16_t value=0;
+       #elif defined(CONFIG_ZTE_CAMERA_NX506J)
+        unsigned short sharp_af_manual_step = 0;
+        uint16_t value=0;
+        uint32_t hw_params = 0;
+    #else
+    uint16_t value=0;
+    uint32_t hw_params = 0;
+    #endif
 	struct msm_camera_i2c_reg_setting reg_setting;
 	CDBG("%s Enter %d\n", __func__, __LINE__);
 	if (set_pos->number_of_steps  == 0)
@@ -771,55 +1020,74 @@ static int32_t msm_actuator_set_position(
 	for (index = 0; index < set_pos->number_of_steps; index++) {
 		next_lens_position = set_pos->pos[index];
 		delay = set_pos->delay[index];
-		#if defined(CONFIG_ZTE_CAMERA_NX505J) || defined(CONFIG_ZTE_CAMERA_NX507J)
-		value = set_pos->pos[index];
-
-		if(value < 0 || value > 79){	 /* if over total steps*/
-		    pr_err("%s Failed I2C write Line %d\n", __func__, __LINE__);
-			return rc;
-		 }
-
-		value=79-value;
-		/*
-		if(value < 5){
-				next_lens_position = 100+10*value;
-		}else{
-			next_lens_position = 140 + 7*(value-4);
-		}
-		if(value == 79)
-		next_lens_position = 900;   
-		*/
-		if(value == 79){
-				/*
-				if(af_macro_value_imx214 > 349 && af_macro_value_imx214 < 751){
-				   next_lens_position = af_macro_value_imx214 + 150;
-				}else{
-                   next_lens_position = a_ctrl->step_position_table[0] + 595;  //595 must less the total steps
-				}
-		        */
-				next_lens_position = 900;
-				a_ctrl->curr_step_pos = 590;
-		}else{
-				next_lens_position = a_ctrl->step_position_table[0] + 7*value;
-				a_ctrl->curr_step_pos = next_lens_position - a_ctrl->step_position_table[0];
-		}
 		
-		pr_err("%s jun next_lens_position = %d, cur_step_pos=%d\n", __func__, next_lens_position,a_ctrl->curr_step_pos);
-		
-		#endif
+        value = set_pos->pos[index];
+        if(value < 0 || value > 79){     /* if over total steps*/
+            pr_err("%s Failed I2C write Line %d\n", __func__, __LINE__);
+                return rc;
+         }
+ 
+        value = 79 - value;
+
+#if defined(CONFIG_ZTE_CAMERA_NX505J) || defined(CONFIG_ZTE_CAMERA_NX507J)|| defined(CONFIG_ZTE_CAMERA_NX504J)
+        if(value == 79){
+		   next_lens_position = 900;
+           a_ctrl->curr_step_pos = a_ctrl->region_params[a_ctrl->region_size - 1].step_bound[MOVE_NEAR] - 3;
+        }else{
+            next_lens_position = a_ctrl->step_position_table[0] + 7*value;
+			a_ctrl->curr_step_pos = next_lens_position - a_ctrl->step_position_table[0];
+        }
+#elif defined(CONFIG_ZTE_CAMERA_NX506J)
+       if(value == 79){
+        next_lens_position = a_ctrl->step_position_table[a_ctrl->total_steps-1];
+        a_ctrl->curr_step_pos = a_ctrl->region_params[a_ctrl->region_size - 1].step_bound[MOVE_NEAR] - 3;
+	 }else{
+        sharp_af_manual_step = (af_macro_value_lc898122_sharp - (af_start_value_lc898122_sharp-30))/70;
+        next_lens_position = (af_start_value_lc898122_sharp-30) + sharp_af_manual_step*value;
+	 a_ctrl->curr_step_pos = next_lens_position - (af_start_value_lc898122_sharp-30);
+	 }
+#else
+        if(value == 79){
+           next_lens_position = a_ctrl->step_position_table[0] + a_ctrl->region_params[a_ctrl->region_size - 1].step_bound[MOVE_NEAR] - 3;
+           //pr_err("%s jun boundy = %d,\n", __func__, a_ctrl->region_params[a_ctrl->region_size - 1].step_bound[MOVE_NEAR]);
+        }else{
+            next_lens_position = a_ctrl->step_position_table[0] + 7*value;
+        }
+                        
+        a_ctrl->curr_step_pos = next_lens_position - a_ctrl->step_position_table[0];
+#endif
+
+        pr_err("%s jun next_lens_position = %d, cur_step_pos=%d\n", __func__, next_lens_position,a_ctrl->curr_step_pos);
+      //add end                       
 		a_ctrl->func_tbl->actuator_parse_i2c_params(a_ctrl,
 		next_lens_position, hw_params, delay);
 
 		reg_setting.reg_setting = a_ctrl->i2c_reg_tbl;
 		reg_setting.size = a_ctrl->i2c_tbl_index;
 		reg_setting.data_type = a_ctrl->i2c_data_type;
-
+#if defined(CONFIG_IMX135_GBAO_LC898122)|| defined(CONFIG_IMX214_OIS_SHARP)
+		if (a_ctrl->i2c_client.cci_client->sid == 0x48 >> 1) {	
+			msm_af_reg_write_lc898122(0x0304,a_ctrl->i2c_reg_tbl->reg_addr);
+			msm_af_reg_write_lc898122(0x0305,a_ctrl->i2c_reg_tbl->reg_data);
+			//printk(" reg_addr =0x%x,reg_data =0x%x\n",a_ctrl->i2c_reg_tbl->reg_addr,a_ctrl->i2c_reg_tbl->reg_data);
+			
+		}
+		if (a_ctrl->i2c_client.cci_client->sid != 0x48 >> 1) {	
+			rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_write_table_w_microdelay(
+			&a_ctrl->i2c_client, &reg_setting);
+			if (rc < 0) {
+				pr_err("%s Failed I2C write Line %d\n", __func__, __LINE__);
+				return rc;
+			}
+		}
+#else
 		rc = a_ctrl->i2c_client.i2c_func_tbl->i2c_write_table_w_microdelay(
 			&a_ctrl->i2c_client, &reg_setting);
 		if (rc < 0) {
 			pr_err("%s Failed I2C write Line %d\n", __func__, __LINE__);
 			return rc;
 		}
+#endif
 		a_ctrl->i2c_tbl_index = 0;
 	}
 	CDBG("%s exit %d\n", __func__, __LINE__);
@@ -846,12 +1114,19 @@ static int32_t msm_actuator_init(struct msm_actuator_ctrl_t *a_ctrl,
 		pr_err("Actuator function table not found\n");
 		return rc;
 	}
-
-	a_ctrl->region_size = set_info->af_tuning_params.region_size;
-	if (a_ctrl->region_size > MAX_ACTUATOR_REGION) {
+	if (set_info->af_tuning_params.total_steps
+		>  MAX_ACTUATOR_AF_TOTAL_STEPS) {
+		pr_err("%s: Max actuator totalsteps exceeded = %d\n",
+		__func__, set_info->af_tuning_params.total_steps);
+		return -EFAULT;
+	}
+	if (set_info->af_tuning_params.region_size
+		> MAX_ACTUATOR_REGION) {
 		pr_err("MAX_ACTUATOR_REGION is exceeded.\n");
 		return -EFAULT;
 	}
+
+	a_ctrl->region_size = set_info->af_tuning_params.region_size;
 	a_ctrl->pwd_step = set_info->af_tuning_params.pwd_step;
 	a_ctrl->total_steps = set_info->af_tuning_params.total_steps;
 
@@ -901,7 +1176,9 @@ static int32_t msm_actuator_init(struct msm_actuator_ctrl_t *a_ctrl,
 		return -EFAULT;
 	}
 
-	if (set_info->actuator_params.init_setting_size) {
+	if (set_info->actuator_params.init_setting_size &&
+		set_info->actuator_params.init_setting_size
+		<= MAX_ACTUATOR_REG_TBL_SIZE) {
 		if (a_ctrl->func_tbl->actuator_init_focus) {
 			init_settings = kmalloc(sizeof(struct reg_settings_t) *
 				(set_info->actuator_params.init_setting_size),
@@ -1022,7 +1299,7 @@ static struct msm_camera_i2c_fn_t msm_sensor_cci_func_tbl = {
 	.i2c_write_table_w_microdelay =
 		msm_camera_cci_i2c_write_table_w_microdelay,
 	.i2c_util = msm_sensor_cci_i2c_util,
-#ifdef CONFIG_IMX135
+#ifdef CONFIG_IMX214_APP
 	.z7_i2c_write_seq_microdelay = 
 		z7_msm_camera_cci_i2c_write_seq_microdelay,
 	.i2c_write_seq = msm_camera_cci_i2c_write_seq,
@@ -1043,7 +1320,7 @@ static int msm_actuator_open(struct v4l2_subdev *sd,
 	struct v4l2_subdev_fh *fh) {
 	int rc = 0;
 	struct msm_actuator_ctrl_t *a_ctrl =  v4l2_get_subdevdata(sd);
-	CDBG("Enter\n");
+	pr_err("Enter\n");
 	if (!a_ctrl) {
 		pr_err("failed\n");
 		return -EINVAL;
@@ -1054,7 +1331,7 @@ static int msm_actuator_open(struct v4l2_subdev *sd,
 		if (rc < 0)
 			pr_err("cci_init failed\n");
 	}
-	CDBG("Exit\n");
+	pr_err("Exit\n");
 	return rc;
 }
 
@@ -1062,7 +1339,7 @@ static int msm_actuator_close(struct v4l2_subdev *sd,
 	struct v4l2_subdev_fh *fh) {
 	int rc = 0;
 	struct msm_actuator_ctrl_t *a_ctrl =  v4l2_get_subdevdata(sd);
-	CDBG("Enter\n");
+	pr_err("Enter\n");
 	if (!a_ctrl) {
 		pr_err("failed\n");
 		return -EINVAL;
@@ -1076,7 +1353,7 @@ static int msm_actuator_close(struct v4l2_subdev *sd,
 	kfree(a_ctrl->i2c_reg_tbl);
 	a_ctrl->i2c_reg_tbl = NULL;
 
-	CDBG("Exit\n");
+	pr_err("Exit\n");
 	return rc;
 }
 
@@ -1125,6 +1402,13 @@ static int32_t msm_actuator_power_up(struct msm_actuator_ctrl_t *a_ctrl)
 		msm_ois_init_cci_lc898122();
 	}
 	#endif
+	
+	#ifdef CONFIG_IMX214_OIS_SHARP
+	if (a_ctrl->i2c_client.cci_client->sid == 0x48 >> 1) {	
+		msm_ois_init_cci_lc898122_sharp();
+	}
+	#endif
+
 	CDBG("Exit\n");
 	return rc;
 }
@@ -1157,7 +1441,7 @@ static const struct i2c_device_id msm_actuator_i2c_id[] = {
 	{"qcom,actuator", (kernel_ulong_t)NULL},
 	{ }
 };
-#ifdef CONFIG_IMX135
+#ifdef CONFIG_IMX214_APP
 void RegRead8byte(uint16_t reg_addr, struct msm_actuator_ctrl_t *a_ctrl)
 {
 	uint8_t data[8];
@@ -1237,10 +1521,104 @@ static ssize_t show_model(struct device *cd,
 	init_add= init_add +1;
 	temp = init | (init_add << 16);
     pr_err("sss %s init_add=%x,state=%d size=%d temp=%lx\n", __func__, (int)init_add, (int)val, (int)count, temp);
-    Regwrite8byte(0x20, 0x08010103, temp, zte_msm_actuator_t);
+    Regwrite8byte(0x20, 0x08010103, temp, zte_msm_actuator_t); 
     return count;
  }
  static DEVICE_ATTR(model, 0644/*S_IRUGO*/, show_model, store_model);
+
+#ifdef CONFIG_IMX214_APP
+struct msm_actuator_ctrl_t msm_actuator_t_ofei_ois ;
+
+enum msm_ofei_ois_data_type {
+	MSM_OIS_BYTE_DATA = 1,
+	MSM_OIS_WORD_DATA,
+};
+
+struct msm_ofei_ois_ctrl_t {
+	struct msm_camera_i2c_client i2c_client;
+	enum af_camera_name cam_name;
+	enum msm_ofei_ois_data_type i2c_data_type;
+	enum cci_i2c_master_t cci_master;
+};
+
+void msm_ofei_init_cci(void)
+{
+       int rc;
+       rc = msm_actuator_t_ofei_ois.i2c_client.i2c_func_tbl->i2c_util(
+               &msm_actuator_t_ofei_ois.i2c_client, MSM_CCI_INIT);
+
+       if (rc < 0)
+               printk("ztemt_ofei cci_init failed\n");
+
+}
+
+void msm_ofei_release_cci(void)
+{
+       int rc;
+       rc = msm_actuator_t_ofei_ois.i2c_client.i2c_func_tbl->i2c_util(
+               &msm_actuator_t_ofei_ois.i2c_client, MSM_CCI_RELEASE);
+
+       if (rc < 0)
+               printk("ztemt_ofei cci_init failed\n");
+
+}
+
+int32_t OfeiRegwrite8byte(uint16_t reg_addr, unsigned long write_data1_32
+	, unsigned long write_data2_32)
+{
+
+
+	uint8_t data[8];
+	int32_t rc=0;
+		  
+	memset(data, 0x00, 8);
+	data[0] = (write_data1_32 >> 24) &0xFF;
+	data[1] = (write_data1_32 >> 16) &0xFF;
+
+	data[2] = (write_data1_32 >> 8) &0xFF;
+	data[3] = (write_data1_32) &0xFF;
+	
+	data[4] = (write_data2_32 >> 24) &0xFF;
+	data[5] = (write_data2_32 >> 16) &0xFF;
+
+	data[6] = (write_data2_32 >> 8) &0xFF;
+	data[7] = (write_data2_32) &0xFF;
+	
+       msm_ofei_init_cci();
+
+	rc =  msm_actuator_t_ofei_ois.i2c_client.i2c_func_tbl->i2c_write_seq
+	(
+	   &msm_actuator_t_ofei_ois.i2c_client,
+	   reg_addr,
+	   data,
+	   8);
+
+       msm_ofei_release_cci();
+
+	if (rc < 0) {
+	   pr_err("%s: line %d rc = %d\n", __func__, __LINE__, rc);
+	}
+	return rc;
+}
+void ofei_shut_down_af_mode(void)
+{
+       int rc = 0;
+	   
+	//debug for click sound
+       rc = OfeiRegwrite8byte(0x01, 0x00000000, 0x00000000);   //shut down ois 
+	msleep(100);
+	rc = OfeiRegwrite8byte(0x15, 0x00640000, 0x00000000);
+	msleep(50);
+	rc = OfeiRegwrite8byte(0x01, 0xFF000000, 0x00000000);//shut down pwn
+	msleep(200);
+	
+	printk("ztemt_ofei enter msm_actuator_power_down  rc = %d\n",rc);
+	
+}
+
+EXPORT_SYMBOL(ofei_shut_down_af_mode);
+EXPORT_SYMBOL(ofei_swtich_to_preview_mode);
+#endif
 
 #endif
 static int32_t msm_actuator_i2c_probe(struct i2c_client *client,
@@ -1318,6 +1696,11 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 	int32_t rc = 0;
 	struct msm_camera_cci_client *cci_client = NULL;
 	struct msm_actuator_ctrl_t *msm_actuator_t = NULL;
+
+	#ifdef CONFIG_IMX214_APP
+       struct msm_camera_cci_client *cci_client_ofei_ois = NULL;
+       #endif
+
 	CDBG("Enter\n");
 
 	if (!pdev->dev.of_node) {
@@ -1335,6 +1718,7 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 		&pdev->id);
 	CDBG("cell-index %d, rc %d\n", pdev->id, rc);
 	if (rc < 0) {
+		kfree(msm_actuator_t);
 		pr_err("failed rc %d\n", rc);
 		return rc;
 	}
@@ -1343,6 +1727,7 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 		&msm_actuator_t->cci_master);
 	CDBG("qcom,cci-master %d, rc %d\n", msm_actuator_t->cci_master, rc);
 	if (rc < 0) {
+		kfree(msm_actuator_t);
 		pr_err("failed rc %d\n", rc);
 		return rc;
 	}
@@ -1359,6 +1744,7 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 	msm_actuator_t->i2c_client.cci_client = kzalloc(sizeof(
 		struct msm_camera_cci_client), GFP_KERNEL);
 	if (!msm_actuator_t->i2c_client.cci_client) {
+		kfree(msm_actuator_t);
 		pr_err("failed no memory\n");
 		return -ENOMEM;
 	}
@@ -1366,6 +1752,33 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 	cci_client = msm_actuator_t->i2c_client.cci_client;
 	cci_client->cci_subdev = msm_cci_get_subdev();
 	cci_client->cci_i2c_master = MASTER_MAX;
+
+
+       #ifdef CONFIG_IMX214_APP
+       msm_actuator_t_ofei_ois.cci_master = 0;
+	msm_actuator_t_ofei_ois.cam_name = 0;
+
+	msm_actuator_t_ofei_ois.i2c_client.i2c_func_tbl = &msm_sensor_cci_func_tbl;
+	msm_actuator_t_ofei_ois.i2c_client.cci_client = kzalloc(sizeof(
+		struct msm_camera_cci_client), GFP_KERNEL);
+	if (!msm_actuator_t_ofei_ois.i2c_client.cci_client) {
+		pr_err("failed no memory\n");
+		return -ENOMEM;
+	}
+
+	cci_client_ofei_ois = msm_actuator_t_ofei_ois.i2c_client.cci_client;
+	cci_client_ofei_ois->cci_subdev = msm_cci_get_subdev();
+
+	msm_actuator_t_ofei_ois.i2c_client.addr_type = MSM_CAMERA_I2C_BYTE_ADDR;
+       msm_actuator_t_ofei_ois.i2c_data_type = MSM_ACTUATOR_BYTE_DATA;
+
+	msm_actuator_t_ofei_ois.i2c_client.cci_client->sid = 0x32 >> 1;
+	msm_actuator_t_ofei_ois.i2c_client.cci_client->retries = 3;
+	msm_actuator_t_ofei_ois.i2c_client.cci_client->id_map = 0;
+	msm_actuator_t_ofei_ois.i2c_client.cci_client->cci_i2c_master = 0;
+	#endif
+
+
 	v4l2_subdev_init(&msm_actuator_t->msm_sd.sd,
 		msm_actuator_t->act_v4l2_subdev_ops);
 	v4l2_set_subdevdata(&msm_actuator_t->msm_sd.sd, msm_actuator_t);
@@ -1378,7 +1791,7 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 	msm_actuator_t->msm_sd.sd.entity.group_id = MSM_CAMERA_SUBDEV_ACTUATOR;
 	msm_actuator_t->msm_sd.close_seq = MSM_SD_CLOSE_2ND_CATEGORY | 0x2;
 	msm_sd_register(&msm_actuator_t->msm_sd);
-	#ifdef CONFIG_IMX135
+	#ifdef CONFIG_IMX214_APP
 	if (!strncmp(dev_name(&pdev->dev),"32.qcom,actuator",sizeof(dev_name(&pdev->dev)))){
 		zte_msm_actuator_t = msm_actuator_t;
 		rc = device_create_file(&pdev->dev, &dev_attr_model);

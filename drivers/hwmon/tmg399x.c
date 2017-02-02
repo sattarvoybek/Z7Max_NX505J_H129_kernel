@@ -257,19 +257,16 @@ static void tmg399x_report_prox(struct tmg399x_chip *chip);
 
 static int board_tmg399x_init(void)
 {
-    SENSOR_LOG_INFO("\n");
 	return 0;
 }
 
 static int board_tmg399x_power(struct device *dev, enum tmg399x_pwr_state state)
 {
-    SENSOR_LOG_INFO("\n");
 	return 0;
 }
 
 static void board_tmg399x_teardown(struct device *dev)
 {
-    SENSOR_LOG_INFO("\n");
 }
 
 static const struct lux_segment tmg399x_segment[] = {
@@ -335,9 +332,34 @@ struct tmg399x_i2c_platform_data tmg399x_data = {
 
 static int tmg399x_parse_dt(struct tmg399x_chip *chip)
 {
+    int rc = 0;
+	u32 tmp;
 	struct device_node *np = chip->client->dev.of_node;
+
 	chip->irq_pin_num = of_get_named_gpio(np, "ams,irq-gpio", 0);
     SENSOR_LOG_INFO("irq_pin_num is %d\n",chip->irq_pin_num);
+
+	rc = of_property_read_u32(np, "ams,prox-offset-cal-ability-tmg399x", &tmp);
+	chip->prox_offset_cal_ability = (!rc ? tmp : 15);
+    SENSOR_LOG_INFO("prox_offset_cal_ability is %d\n", chip->prox_offset_cal_ability);
+
+	rc = of_property_read_u32(np, "ams,gesture-offset-cal-ability-tmg399x", &tmp);
+	chip->gesture_offset_cal_ability = (!rc ? tmp : 35);
+    SENSOR_LOG_INFO("gesture_offset_cal_ability is %d\n", chip->gesture_offset_cal_ability);
+
+	rc = of_property_read_u32(np, "ams,prox-led-plus-cnt-tmg399x", &tmp);
+	chip->prox_led_plus_cnt = (!rc ? tmp : 4);
+    SENSOR_LOG_INFO("prox_led_plus_cnt is %d\n", chip->prox_led_plus_cnt);
+
+	rc = of_property_read_u32(np, "ams,gesture-led-plus-cnt-tmg399x", &tmp);
+	chip->gesture_led_plus_cnt = (!rc ? tmp : 4);
+    SENSOR_LOG_INFO("gesture_led_plus_cnt is %d\n", chip->gesture_led_plus_cnt);
+
+	rc = of_property_read_u32(np, "ams,light-percent", &tmp);
+	chip->light_percent = (!rc ? tmp : 100);
+    SENSOR_LOG_INFO("light_percent is %d\n", chip->light_percent);
+
+
     return 0;
 }
 
@@ -447,8 +469,6 @@ static int tmg399x_flush_regs(struct tmg399x_chip *chip)
 	int ret;
 	u8 reg;
 
-	dev_info(&chip->client->dev, "%s\n", __func__);
-
 	for (i = 0; i < ARRAY_SIZE(restorable_regs); i++) {
 		reg = restorable_regs[i];
 		ret = tmg399x_i2c_write(chip, reg, chip->shadow[reg]);
@@ -510,6 +530,8 @@ static void tmg399x_chip_data_init(struct tmg399x_chip *chip)
     chip->gesture_data_max                  = GESTURE_DATA_MAX;
     chip->gesture_data_safe_range_max       = GESTURE_DATA_SAFE_RANGE_MAX;
     chip->gesture_data_safe_range_min       = GESTURE_DATA_SAFE_RANGE_MIN;
+    chip->prox_offset_cal_per_bit           = chip->prox_offset_cal_ability * chip->prox_led_plus_cnt;
+    chip->gesture_offset_cal_per_bit        = chip->gesture_offset_cal_ability * chip->gesture_led_plus_cnt;
     chip->prox_calibrate_times              = 0;
     chip->prox_uncover_data                 = 0;
     chip->chip_name                         = "tmg3993";
@@ -522,9 +544,12 @@ static void tmg399x_chip_data_init(struct tmg399x_chip *chip)
     chip->gesture_offset_cal_start          = false;
     chip->phone_is_sleep                    = false;
     chip->irq_work_status                   = false;
+    chip->gesture_offset_cal_pending        = false;
     chip->proximity_wakelock.name           = "proximity-wakelock";
     chip->proximity_wakelock.locked         = false;
     chip->light_poll_time                   = AMS_ALS_POLL_DELAY_SLOW;
+	chip->prox_calibrate_verify             = true;
+	chip->prox_offset_cal_verify            = true;
 }
 
 static void tmg399x_irq_enable(bool enable, bool flag_sync)
@@ -533,6 +558,10 @@ static void tmg399x_irq_enable(bool enable, bool flag_sync)
     {
         SENSOR_LOG_INFO("doubule %s irq, retern here\n",enable? "enable" : "disable");
         return;
+    }
+    else
+    {
+        p_global_tmg399x_chip->irq_enabled  = enable;
     }
 
     if (enable)
@@ -551,9 +580,6 @@ static void tmg399x_irq_enable(bool enable, bool flag_sync)
             disable_irq_nosync(p_global_tmg399x_chip->client->irq);
         }
     }
-
-    p_global_tmg399x_chip->irq_enabled  = enable;
-    //SENSOR_LOG_INFO("%s irq \n",enable? "enable" : "disable");
 }
 
 
@@ -3265,12 +3291,16 @@ static ssize_t tmg399x_gesture_data_show(struct device *dev,
     wait_event_interruptible(gesture_drdy_wq, (atomic_read(&gesture_drdy) == 1));
 
     mutex_lock(&chip->lock);
-
-    ret = tmg399x_get_ges(chip);
-    if (ret>0)
+    
+    if (false == chip->gesture_offset_cal_pending)
     {
-        memcpy(buf, &(chip->gesture_data[0]), ret * sizeof(struct tmg399x_ges_raw_data));
+        ret = tmg399x_get_ges(chip);
+        if (ret>0)
+        {
+            memcpy(buf, &(chip->gesture_data[0]), ret * sizeof(struct tmg399x_ges_raw_data));
+        }
     }
+
 
     tmg399x_i2c_modify(chip, TMG399X_GES_CFG_4, TMG399X_GES_INT_CLR, TMG399X_GES_INT_CLR);
     
@@ -3849,7 +3879,7 @@ static ssize_t tmg399x_get_reg_data(struct device *dev,
             i2c_smbus_write_byte(p_global_tmg399x_chip->client, i);
             SENSOR_LOG_ERROR("reg[0x%02X] = 0x%02X",i,i2c_smbus_read_byte(p_global_tmg399x_chip->client));
         }
-    }   
+    }
     else
     {
         i2c_smbus_write_byte(p_global_tmg399x_chip->client, reg_addr);
@@ -3861,6 +3891,28 @@ static ssize_t tmg399x_get_reg_data(struct device *dev,
 	return strlen(buf);
 }
 
+
+static ssize_t tmg399x_dump_show(struct device *dev,
+		struct device_attribute *attr,	char *buf)
+{
+    int i;
+
+    mutex_lock(&p_global_tmg399x_chip->lock);
+
+    for (i=0x80; i<=0xFF; i++)
+    {
+        i2c_smbus_write_byte(p_global_tmg399x_chip->client, i);
+        SENSOR_LOG_ERROR("reg[0x%02X] = 0x%02X",i,i2c_smbus_read_byte(p_global_tmg399x_chip->client));
+    }
+
+    SENSOR_LOG_ERROR("als is %s\n",p_global_tmg399x_chip->als_enabled? "on" : "off");
+    SENSOR_LOG_ERROR("prx is %s\n",p_global_tmg399x_chip->prx_enabled? "on" : "off");
+    SENSOR_LOG_ERROR("ges is %s\n",p_global_tmg399x_chip->ges_enabled? "on" : "off");
+
+    mutex_unlock(&p_global_tmg399x_chip->lock);
+
+	return strlen(buf);
+}
 
 static ssize_t tmg399x_irq_show(struct device *dev,
 		struct device_attribute *attr,	char *buf)
@@ -4139,7 +4191,73 @@ static ssize_t tmg399x_prox_threshold_low_store(struct device *dev,
 	return size;
 }
 
-static int tmg399x_prox_offset_calculate(int data, int target)
+static ssize_t tmg399x_prox_offset_cal_verify_show(struct device *dev,
+		struct device_attribute *attr,	char *buf)
+{
+	struct tmg399x_chip *chip = dev_get_drvdata(dev);
+    if (NULL != chip)
+    {
+        return sprintf(buf, "%d", chip->prox_offset_cal_verify);
+    }
+    else
+    {
+        sprintf(buf, "chip is NULL\n");
+    }
+	return strlen(buf);
+}
+
+static ssize_t tmg399x_prox_offset_cal_verify_store(struct device *dev,
+		struct device_attribute *attr,	const char *buf, size_t size)
+{
+	struct tmg399x_chip *chip = dev_get_drvdata(dev);
+    unsigned long val = 0;
+
+    SENSOR_LOG_ERROR("enter\n");
+    if (strict_strtoul(buf, 10, &val))
+    {
+        return -EINVAL;
+    }
+
+	chip->prox_offset_cal_verify = val;
+
+    SENSOR_LOG_ERROR("exit\n");
+	return size;
+}
+
+static ssize_t tmg399x_prox_calibrate_verify_show(struct device *dev,
+		struct device_attribute *attr,	char *buf)
+{
+	struct tmg399x_chip *chip = dev_get_drvdata(dev);
+    if (NULL != chip)
+    {
+        return sprintf(buf, "%d", chip->prox_calibrate_verify);
+    }
+    else
+    {
+        sprintf(buf, "chip is NULL\n");
+    }
+	return strlen(buf);
+}
+
+static ssize_t tmg399x_prox_calibrate_verify_store(struct device *dev,
+		struct device_attribute *attr,	const char *buf, size_t size)
+{
+	struct tmg399x_chip *chip = dev_get_drvdata(dev);
+    unsigned long val = 0;
+
+    SENSOR_LOG_ERROR("enter\n");
+    if (strict_strtoul(buf, 10, &val))
+    {
+        return -EINVAL;
+    }
+
+	chip->prox_calibrate_verify = val;
+
+    SENSOR_LOG_ERROR("exit\n");
+	return size;
+}
+
+static int tmg399x_prox_offset_calculate(struct tmg399x_chip *chip, int data, int target)
 {
     int offset;
 
@@ -4150,11 +4268,11 @@ static int tmg399x_prox_offset_calculate(int data, int target)
 
     if (data > target)
     {
-        offset = (data - target) * PROX_OFFSET_CAL_PER_BIT;
+        offset = (data - target) * 100 / chip->prox_offset_cal_per_bit;
     }
     else
     {
-        offset = (target - data) * PROX_OFFSET_CAL_PER_BIT + 128;
+        offset = (target - data) * 100 / chip->prox_offset_cal_per_bit + 128;
     }
 
     return offset;
@@ -4236,7 +4354,7 @@ static int tmg399x_prox_offset_cal_ne_process(struct tmg399x_chip *chip)
     for (i = 0; i < PROX_OFFSET_CAL_BUFFER_SIZE; i++) 
     {
        tmg399x_read_prox_data(chip);
-       if (chip->shadow[TMG399X_PRX_CHAN] > 0)
+       if (chip->shadow[TMG399X_PRX_CHAN] >= 0)
        {
            prox_sum += chip->shadow[TMG399X_PRX_CHAN];
            j++;
@@ -4254,7 +4372,12 @@ static int tmg399x_prox_offset_cal_ne_process(struct tmg399x_chip *chip)
 
     prox_mean = prox_sum / j;
     SENSOR_LOG_ERROR("prox data ne mean = %d\n",prox_mean);
-    prox_offset_ne = tmg399x_prox_offset_calculate(prox_mean, PROX_DATA_TARGET);
+    prox_offset_ne = tmg399x_prox_offset_calculate(chip, prox_mean, PROX_DATA_TARGET);
+
+    if (0==prox_sum)
+    {
+        prox_offset_ne = prox_offset_ne + PROX_OFFSET_CAL_MANUAL_ADD;
+    }
 
     ret = tmg399x_i2c_write(chip, TMG399X_PRX_OFFSET_NE, prox_offset_ne);
     if (!ret)
@@ -4287,7 +4410,7 @@ static int tmg399x_prox_offset_cal_sw_process(struct tmg399x_chip *chip)
     {
         tmg399x_read_prox_data(chip);   
 
-        if (chip->shadow[TMG399X_PRX_CHAN]>0)
+        if (chip->shadow[TMG399X_PRX_CHAN]>=0)
         {
             prox_sum += chip->shadow[TMG399X_PRX_CHAN];
             j++;
@@ -4304,7 +4427,12 @@ static int tmg399x_prox_offset_cal_sw_process(struct tmg399x_chip *chip)
 
     prox_mean = prox_sum / j;
     SENSOR_LOG_ERROR("prox data sw mean = %d\n",prox_mean);
-    prox_offset_sw = tmg399x_prox_offset_calculate(prox_mean, PROX_DATA_TARGET);
+    prox_offset_sw = tmg399x_prox_offset_calculate(chip, prox_mean, PROX_DATA_TARGET);
+
+    if (0==prox_sum)
+    {
+        prox_offset_sw = prox_offset_sw + PROX_OFFSET_CAL_MANUAL_ADD;
+    }
 
 	ret = tmg399x_i2c_write(chip, TMG399X_PRX_OFFSET_SW, prox_offset_sw);
 	if (!ret) 
@@ -4399,7 +4527,7 @@ static int tmg399x_prox_offset_cal(struct tmg399x_chip *chip)
     return ret;
 }
 
-static int tmg399x_gesture_offset_calculate(int data, int target)
+static int tmg399x_gesture_offset_calculate(struct tmg399x_chip *chip, int data, int target)
 {
     int offset;
 
@@ -4410,11 +4538,11 @@ static int tmg399x_gesture_offset_calculate(int data, int target)
 
     if (data > target)
     {
-        offset = (data - target) * GESTURE_OFFSET_CAL_PER_BIT;
+        offset = (data - target) * 100 / chip->gesture_offset_cal_per_bit;
     }
     else
     {
-        offset = (target - data) * GESTURE_OFFSET_CAL_PER_BIT + 128;
+        offset = (target - data) * 120 / chip->gesture_offset_cal_per_bit + 128;
     }
 
     return offset;
@@ -4443,6 +4571,8 @@ static void tmg399x_gesture_offset_cal_prepare(struct tmg399x_chip *chip)
     tmg399x_i2c_write(chip, TMG399X_GES_OFFSET_S, 0);
     tmg399x_i2c_write(chip, TMG399X_GES_OFFSET_W, 0);
     tmg399x_i2c_write(chip, TMG399X_GES_OFFSET_E, 0);
+
+    chip->gesture_offset_cal_pending = true;
 }
 
 static int tmg399x_gesture_offset_cal_process(struct tmg399x_chip *chip)
@@ -4465,14 +4595,16 @@ static int tmg399x_gesture_offset_cal_process(struct tmg399x_chip *chip)
     u8  i = 0;
     u8  j = 0;
     int ret = 0; 
-   
+
+    ret = tmg399x_get_ges(chip);
+
     for (i = 0; i < GESTURE_OFFSET_CAL_BUFFER_SIZE; i++) 
     {
         ret = tmg399x_get_ges(chip);
-        if (((chip->gesture_data[0].north>0)&&(chip->gesture_data[0].north<=255))&&
-            ((chip->gesture_data[0].south>0)&&(chip->gesture_data[0].south<=255))&&
-            ((chip->gesture_data[0].west>0)&&(chip->gesture_data[0].west<=255))&&
-            ((chip->gesture_data[0].east>0)&&(chip->gesture_data[0].east<=255))) 
+        if (((chip->gesture_data[0].north>=0)&&(chip->gesture_data[0].north<=255))&&
+            ((chip->gesture_data[0].south>=0)&&(chip->gesture_data[0].south<=255))&&
+            ((chip->gesture_data[0].west>=0)&&(chip->gesture_data[0].west<=255))&&
+            ((chip->gesture_data[0].east>=0)&&(chip->gesture_data[0].east<=255)))
         {
             gesture_sum_n += chip->gesture_data[0].north;
             gesture_sum_s += chip->gesture_data[0].south;
@@ -4505,10 +4637,30 @@ static int tmg399x_gesture_offset_cal_process(struct tmg399x_chip *chip)
     SENSOR_LOG_ERROR("gesture_mean_w = %d\n", gesture_mean_w);
     SENSOR_LOG_ERROR("gesture_mean_e = %d\n", gesture_mean_e);
 
-    gesture_offset_n = tmg399x_gesture_offset_calculate(gesture_mean_n, GESTURE_DATA_TARGET);
-    gesture_offset_s = tmg399x_gesture_offset_calculate(gesture_mean_s, GESTURE_DATA_TARGET);
-    gesture_offset_w = tmg399x_gesture_offset_calculate(gesture_mean_w, GESTURE_DATA_TARGET);
-    gesture_offset_e = tmg399x_gesture_offset_calculate(gesture_mean_e, GESTURE_DATA_TARGET);
+    gesture_offset_n = tmg399x_gesture_offset_calculate(chip, gesture_mean_n, GESTURE_DATA_TARGET);
+    gesture_offset_s = tmg399x_gesture_offset_calculate(chip, gesture_mean_s, GESTURE_DATA_TARGET);
+    gesture_offset_w = tmg399x_gesture_offset_calculate(chip, gesture_mean_w, GESTURE_DATA_TARGET);
+    gesture_offset_e = tmg399x_gesture_offset_calculate(chip, gesture_mean_e, GESTURE_DATA_TARGET);
+
+    if (0==gesture_mean_n)
+    {
+        gesture_offset_n = gesture_offset_n + GESTURE_OFFSET_CAL_MANUAL_ADD;
+    }
+
+    if (0==gesture_mean_s)
+    {
+        gesture_offset_s = gesture_offset_s + GESTURE_OFFSET_CAL_MANUAL_ADD;
+    }
+
+    if (0==gesture_mean_w)
+    {
+        gesture_offset_w = gesture_offset_w + GESTURE_OFFSET_CAL_MANUAL_ADD;
+    }
+
+    if (0==gesture_mean_e)
+    {
+        gesture_offset_e = gesture_offset_e + GESTURE_OFFSET_CAL_MANUAL_ADD;
+    }
 
     chip->params.ges_offset_n = gesture_offset_n;
     chip->pdata->parameters.ges_offset_n = gesture_offset_n;
@@ -4558,6 +4710,8 @@ static void tmg399x_gesture_offset_cal_finish(struct tmg399x_chip *chip)
     {   
         tmg399x_ges_enable(chip, false);
     }
+
+    chip->gesture_offset_cal_pending = false;
 }
 
 static int tmg399x_gesture_offset_cal(struct tmg399x_chip *chip)
@@ -4623,6 +4777,9 @@ static struct device_attribute attrs_prox[] = {
     __ATTR(tmg_clear_irq,                   0640,   NULL,                                   tmg399x_irq_clear),
     __ATTR(prox_threshold_high,             0644,   tmg399x_prox_threshold_high_show,       tmg399x_prox_threshold_high_store),
     __ATTR(prox_threshold_low,              0644,   tmg399x_prox_threshold_low_show,        tmg399x_prox_threshold_low_store),
+    __ATTR(prox_offset_cal_verify,          0644,   tmg399x_prox_offset_cal_verify_show,    tmg399x_prox_offset_cal_verify_store),
+    __ATTR(prox_calibrate_verify,           0644,   tmg399x_prox_calibrate_verify_show,     tmg399x_prox_calibrate_verify_store),
+    __ATTR(chip_dump,                       0644,   tmg399x_dump_show,                      NULL),
 };
 
 
@@ -4935,7 +5092,6 @@ static int tmg399x_set_segment_table(struct tmg399x_chip *chip,
 
 	if (!chip->segment) 
     {
-		dev_info(dev, "%s: allocating segment table\n", __func__);
 		chip->segment = kzalloc(sizeof(*chip->segment) *
 				chip->seg_num_max, GFP_KERNEL);
 		if (!chip->segment) {
@@ -4950,25 +5106,21 @@ static int tmg399x_set_segment_table(struct tmg399x_chip *chip,
 	} else {
 		chip->segment_num = seg_num;
 	}
-	memcpy(chip->segment, segment,
-			chip->segment_num * sizeof(*chip->segment));
-	dev_info(dev, "%s: %d segment requested, %d applied\n", __func__,
-			seg_num, chip->seg_num_max);
+	memcpy(chip->segment, segment, chip->segment_num * sizeof(*chip->segment));
 	for (i = 0; i < chip->segment_num; i++)
-		dev_info(dev,
-		"seg %d: d_factor %d, r_coef %d, g_coef %d, b_coef %d, ct_coef %d ct_offset %d\n",
+    {
+        SENSOR_LOG_INFO("seg %d: d_factor %d, r_coef %d, g_coef %d, b_coef %d, ct_coef %d ct_offset %d\n",
 		i, chip->segment[i].d_factor, chip->segment[i].r_coef,
 		chip->segment[i].g_coef, chip->segment[i].b_coef,
 		chip->segment[i].ct_coef, chip->segment[i].ct_offset);
-	return 0;
+	}
+    return 0;
 }
 
 static void tmg399x_set_defaults(struct tmg399x_chip *chip)
 {
-	struct device *dev = &chip->client->dev;
-
 	if (chip->pdata) {
-		dev_info(dev, "%s: Loading pltform data\n", __func__);
+		SENSOR_LOG_INFO("Loading pltform data\n");
 		chip->params.als_time = chip->pdata->parameters.als_time;
 		chip->params.als_gain = chip->pdata->parameters.als_gain;
 		chip->params.als_deltaP = chip->pdata->parameters.als_deltaP;
@@ -4985,7 +5137,7 @@ static void tmg399x_set_defaults(struct tmg399x_chip *chip)
 		chip->params.prox_offset_sw = chip->pdata->parameters.prox_offset_sw;
 		chip->params.als_prox_cfg3 = chip->pdata->parameters.als_prox_cfg3;
 	} else {
-		dev_info(dev, "%s: use defaults\n", __func__);
+		SENSOR_LOG_INFO("use defaults data\n");
 		chip->params.als_time = param_default.als_time;
 		chip->params.als_gain = param_default.als_gain;
 		chip->params.als_deltaP = param_default.als_deltaP;
@@ -5105,6 +5257,9 @@ static void tmg399x_als_poll_work_func(struct work_struct *work)
                                                                 p_global_tmg399x_chip->als_inf.cct);
     }
 
+
+    p_global_tmg399x_chip->als_inf.lux = p_global_tmg399x_chip->als_inf.lux * p_global_tmg399x_chip->light_percent / 100;
+
     if (p_global_tmg399x_chip->als_inf.lux>10000)
     {
         p_global_tmg399x_chip->als_inf.lux = 10000;
@@ -5148,12 +5303,48 @@ static enum hrtimer_restart tmg399x_unwakelock_work_func(struct hrtimer *timer)
 }
 
 
+static int tmg399x_id_detect(struct tmg399x_chip *chip)
+{
+    int ret = 0, i = 0;
+	u8 id, rev;
+    
+    ret = tmg399x_get_id(chip, &id, &rev);
+    if (ret < 0)
+    {
+        dev_err(&chip->client->dev,"%s: failed to get tmg399x id\n",__func__);
+    }
 
+    for (i = 0; i < ARRAY_SIZE(tmg399x_ids); i++) 
+    {
+        if (id == tmg399x_ids[i])
+        {
+            if (i>=1)
+            {
+                i = 1;
+            }
+            break;
+        }
+    }
+    
+    if (i < ARRAY_SIZE(tmg399x_names)) 
+    {
+        SENSOR_LOG_INFO("chip is %s, rev is %02x, id is %02x\n",tmg399x_names[i], rev, id);
+        chip->device_index = i;
+        return 0;
+    } 
+    else 
+    {
+        goto tmg399x_id_detect_error;
+    }
+
+tmg399x_id_detect_error:
+    SENSOR_LOG_ERROR("not supported rev is %02x, id is %02x\n", rev, id);
+    return -EOPNOTSUPP;
+}
 
 static int __devinit tmg399x_probe(struct i2c_client *client, const struct i2c_device_id *idp)
 {
-	int i, ret;
-	u8 id, rev;
+	int ret;
 	struct device *dev = &client->dev;
 	static struct tmg399x_chip *chip;
 	struct tmg399x_i2c_platform_data *pdata = &tmg399x_data;
@@ -5203,9 +5394,15 @@ static int __devinit tmg399x_probe(struct i2c_client *client, const struct i2c_d
 	chip->pdata = pdata;
 	i2c_set_clientdata(client, chip);
 
-    tmg399x_chip_data_init(chip);
+    ret = tmg399x_id_detect(chip);
+    if (ret < 0)
+    {
+        goto id_detect_failed;
+    }
 
     tmg399x_parse_dt(chip);
+
+    tmg399x_chip_data_init(chip);
 
     p_global_tmg399x_chip = chip;
 
@@ -5220,20 +5417,17 @@ static int __devinit tmg399x_probe(struct i2c_client *client, const struct i2c_d
 	if (ret)
 		goto set_segment_failed;
 
+    /*
 	ret = tmg399x_get_id(chip, &id, &rev);
 	if (ret < 0)
 		dev_err(&chip->client->dev,
 			"%s: failed to get tmg399x id\n",
 			__func__);
 
-	dev_info(dev, "%s: device id:%02x device rev:%02x\n", __func__,
-				id, rev);
-
 	for (i = 0; i < ARRAY_SIZE(tmg399x_ids); i++) 
     {
 		if (id == tmg399x_ids[i])
         {
-            SENSOR_LOG_INFO("id = %d\n",id);
             if (i>=1)
             {
                 i = 1;
@@ -5244,15 +5438,16 @@ static int __devinit tmg399x_probe(struct i2c_client *client, const struct i2c_d
 
 	if (i < ARRAY_SIZE(tmg399x_names)) 
     {
-		dev_info(dev, "%s: '%s rev. %d' detected\n", __func__, tmg399x_names[i], rev);
+		SENSOR_LOG_INFO("chip is %s, rev is %02x, id is %02x\n",tmg399x_names[i], rev, id);
 		chip->device_index = i;
 	} 
     else 
     {
-		dev_err(dev, "%s: not supported chip id\n", __func__);
+		SENSOR_LOG_INFO("not supported rev is %02x, id is %02x\n", rev, id);
 		ret = -EOPNOTSUPP;
 		goto id_failed;
 	}
+    */
 
 	mutex_init(&chip->lock);
     wake_lock_init(&chip->proximity_wakelock.lock, WAKE_LOCK_SUSPEND, (chip->proximity_wakelock).name);
@@ -5503,9 +5698,9 @@ input_p_register_failed:
 	}	
 input_p_alloc_failed:
 flush_regs_failed:
-id_failed:
 	kfree(chip->segment);
 set_segment_failed:
+id_detect_failed:
 	i2c_set_clientdata(client, NULL);
 	kfree(chip);
 malloc_failed:
@@ -5585,7 +5780,7 @@ static int tmg399x_prox_calibrate(struct tmg399x_chip *chip)
     {
         if (prox_max > 230)
         {
-       	    chip->params.prox_th_high = 255;
+       	    chip->params.prox_th_high = 240;
             chip->params.prox_th_low  = chip->params.prox_th_high - PROX_THRESHOLD_DISTANCE;
         }
         else

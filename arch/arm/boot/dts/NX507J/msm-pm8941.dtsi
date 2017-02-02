@@ -57,7 +57,11 @@
 
 		qcom,pon_1 {
 			qcom,pon-type = <0>;
+			qcom,support-reset = <1>;
 			qcom,pull-up = <1>;
+			qcom,s1-timer = <10256>;
+			qcom,s2-timer = <2000>;
+			qcom,s2-type = <1>;
 			linux,code = <116>;
 		};
 /* Removed by yfliu, for PWK
@@ -122,7 +126,7 @@
 		qcom,v-cutoff-uv = <3400000>;
 		qcom,max-voltage-uv = <4350000>;  //ZTEMT_CHARGE 4200000 --> 4350000
 		qcom,r-conn-mohm = <0>;
-		qcom,shutdown-soc-valid-limit = <100>;
+		qcom,shutdown-soc-valid-limit = <40>;   //ZTEMT_CHARGE 100 --> 40
 		qcom,adjust-soc-low-threshold = <15>;
 		qcom,ocv-voltage-high-threshold-uv = <3750000>;
 		qcom,ocv-voltage-low-threshold-uv = <3650000>;
@@ -131,7 +135,7 @@
 		qcom,low-soc-calculate-soc-ms = <5000>;
 		qcom,calculate-soc-ms = <20000>;
 		qcom,chg-term-ua = <100000>;
-		qcom,batt-type = <3>;  //ZTEMT_CHARGE  0 --> 3 OEM battery type
+		qcom,batt-type = <3>;  //ZTEMT_CHARGE  0 --> 3 BATT_OEM type
 		qcom,low-voltage-threshold = <3420000>;
 		qcom,tm-temp-margin = <5000>;
 		qcom,low-ocv-correction-limit-uv = <100>;
@@ -140,7 +144,7 @@
 		qcom,bms-vadc = <&pm8941_vadc>;
 		qcom,bms-iadc = <&pm8941_iadc>;
 		qcom,bms-adc_tm = <&pm8941_adc_tm>;
-        
+
 		qcom,batt-pres-status@1208 {
 			reg = <0x1208 0x1>;
 		};
@@ -211,7 +215,7 @@
 		qcom,ibatmax-cool-ma = <350>;
 		qcom,vbatdet-delta-mv = <50>;  //ZTEMT_CHARGE 100 --> 50
 		qcom,resume-soc = <99>;
-		qcom,tchg-mins = <150>;  
+		qcom,tchg-mins = <150>;
 		qcom,chg-vadc = <&pm8941_vadc>;
 		qcom,chg-iadc = <&pm8941_iadc>;
 		qcom,chg-adc_tm = <&pm8941_adc_tm>;
@@ -221,8 +225,7 @@
 		qcom,batt-hot-percentage = <25>;
 		qcom,batt-cold-percentage = <80>;
 		//ZTEMT end
-
-		qcom,chgr@1000 {
+		pm8941_chg_chgr: qcom,chgr@1000 {
 			status = "disabled";
 			reg = <0x1000 0x100>;
 			interrupts =	<0x0 0x10 0x0>,
@@ -319,13 +322,6 @@
 		};
 	};
 
-    ztemt_hw_version{
-		spmi-dev-container;
-		compatible = "qcom,qpnp-ztemt_hw_version";
-		#address-cells = <1>;
-		#size-cells = <1>;
-		status = "ok";	
-	};
 	pm8941_gpios: gpios {
 		spmi-dev-container;
 		compatible = "qcom,qpnp-pin";
@@ -408,7 +404,6 @@
 		gpio@ce00 {
 			reg = <0xce00 0x100>;
 			qcom,pin-num = <15>;
-			qcom,out-strength = <3>;
 		};
 
 		gpio@cf00 {
@@ -848,10 +843,6 @@
 			label = "internal_rsense";
 			reg = <0>;
 			qcom,decimation = <0>;
-			qcom,pre-div-channel-scaling = <1>;
-			qcom,calibration-type = "absolute";
-			qcom,scale-function = <0>;
-			qcom,hw-settle-time = <0>;
 			qcom,fast-avg-setup = <0>;
 		};
 	};
@@ -1256,7 +1247,6 @@
 		compatible = "qcom,qpnp-vibrator";
 		reg = <0xc000 0x100>;
 		label = "vibrator";
-		qcom,vib-vtg-level-mV = <3000>;
 		status = "ok";
 	};
 
@@ -1292,6 +1282,7 @@
 		label = "flash";
 		flash-boost-supply = <&pm8941_chg_boost>;
 		torch-boost-supply = <&pm8941_boost>;
+		flash-wa-supply = <&pm8941_chg_chgr>;
 	};
 
 	qcom,leds@d400 {

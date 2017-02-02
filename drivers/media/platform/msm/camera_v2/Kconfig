@@ -118,7 +118,7 @@ config IMX135_Z5S
 		snapshot config = 4208 x 3120 at 24 fps,
 		Video HDR support.
 config IMX135_Z5S_069
-	bool "Sensor IMX135_Z5S (BAYER 12M)"
+	bool "Sensor IMX135_Z5S_069 (BAYER 12M)"
 	depends on MSMB_CAMERA
 	---help---
 		Sony 12 MP Bayer Sensor with auto focus, uses
@@ -143,12 +143,39 @@ config IMX214
 		Video HDR support.
 
 config IMX214_LC898122
-	bool "Sensor IMX214 (BAYER 12M)"
+	bool "Sensor IMX214_LC898122 (BAYER 12M)"
 	depends on MSMB_CAMERA
 	---help---
 		Sony 12 MP Bayer Sensor with auto focus, ois ,uses
 		4 mipi lanes, preview config = 2104 x 1560 at 49 fps,
 		snapshot config = 4208 x 3120 at 24 fps,
+		Video HDR support.
+		
+config IMX214_OIS_SHARP
+	bool "Sensor IMX214_OIS_SHARP (BAYER 13M)"
+	depends on MSMB_CAMERA
+	---help---
+		Sony 13 MP Bayer Sensor with auto focus, ois ,uses
+		4 mipi lanes, preview config = 2104 x 1560 at 49 fps,
+		snapshot config = 4208 x 3120 at 24 fps,
+		Video HDR support.
+	
+config IMX214_APP
+	bool "Sensor IMX214_APP (BAYER 13M)"
+	depends on MSMB_CAMERA
+	---help---
+		Sony 13 MP Bayer Sensor with auto focus, ois ,uses
+		4 mipi lanes, preview config = 2104 x 1560 at 49 fps,
+		snapshot config = 4208 x 3120 at 24 fps,
+		Video HDR support.
+
+config IMX220
+	bool "Sensor IMX220 (BAYER 20M)"
+	depends on MSMB_CAMERA
+	---help---
+		Sony 20 MP Bayer Sensor with auto focus, ois ,uses
+		4 mipi lanes, preview config = 2624 x 1968 at 24 fps,
+		snapshot config = 5248 x 3936 at 12 fps,
 		Video HDR support.
 
 config IMX134
@@ -233,6 +260,15 @@ config OV5648
 		preview set to 1296*972 at 30 fps,
 		snapshot set to 2592*1944 at 12 fps,
 		This sensor driver does not support auto focus.
+
+config T4K35
+	bool "Sensor T4K35 (BAYER 8M)"
+	depends on MSMB_CAMERA
+	---help---
+		Toshiba 8 MP Bayer Sensor, only use 2 mipi lane,
+		snapshot set to 3280*2464 at 30 fps,
+		This sensor driver does not support auto focus.
+
 
 config OV5648_Z5S
 	bool "Sensor OV5648_Z5S (BAYER 5M)"
@@ -340,3 +376,7 @@ config ZTE_CAMERA_FLASH_THERMAL
 	tristate "z7 camera flash thermal"
 config ZTE_CAMERA_NX506J
 	tristate "nx506j camera support"
+config ZTE_CAMERA_NX504J
+	tristate "nx504j camera support"
+config ZTE_CAMERA_DUAL_LED
+	tristate "camera dual led support"

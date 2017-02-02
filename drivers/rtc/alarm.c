@@ -88,7 +88,7 @@ void set_power_on_alarm(long secs, bool enable)
 		else
 			power_on_alarm = 0;
 	}
-			
+
 	set_alarm_time_to_rtc(power_on_alarm);
 	mutex_unlock(&power_on_alarm_mutex);
 }
@@ -523,6 +523,7 @@ static int alarm_resume(struct platform_device *pdev)
 									false);
 	spin_unlock_irqrestore(&alarm_slock, flags);
 
+	set_alarm_time_to_rtc(power_on_alarm);
 	return 0;
 }
 
@@ -570,7 +571,6 @@ static int set_alarm_time_to_rtc(const long power_on_time)
 	 * to powerup the device before actual alarm
 	 * expiration.
 	 */
-	
 	if ((alarm_time - ALARM_DELTA) > rtc_secs)
 		alarm_time -= ALARM_DELTA;
 
@@ -580,8 +580,6 @@ static int set_alarm_time_to_rtc(const long power_on_time)
 	rtc_time_to_tm(alarm_time, &alarm.time);
 	alarm.enabled = 1;
 	rc = rtc_set_alarm(alarm_rtc_dev, &alarm);
-	
-
 	if (rc){
 		pr_alarm(ERROR, "Unable to set power-on alarm\n");
 		goto disable_alarm;

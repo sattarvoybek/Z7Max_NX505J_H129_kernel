@@ -10,7 +10,18 @@
  * GNU General Public License for more details.
  *
  */
+#include <mach/gpiomux.h>
 #include "msm_sensor.h"
+#include "msm_sd.h"
+#include "camera.h"
+#include "msm_cci.h"
+#include "msm_camera_io_util.h"
+#include "msm_camera_i2c_mux.h"
+#include <mach/rpm-regulator.h>
+#include <mach/rpm-regulator-smd.h>
+#include <linux/regulator/consumer.h>
+#include "../../../../../../video/msm/mdss/mdss_fb.h"
+
 #define IMX135_SENSOR_NAME "imx135_z5s_069"
 DEFINE_MSM_MUTEX(imx135_mut);
 
@@ -165,12 +176,45 @@ static void __exit imx135_z5s_069_exit_module(void)
 		i2c_del_driver(&imx135_i2c_driver);
 	return;
 }
+static int RegRead8byte_adaptive(uint16_t reg_addr, struct msm_sensor_ctrl_t *s_ctrl)
+{
+	uint8_t data[8];
+	int32_t rc=0;
+	enum msm_camera_i2c_reg_addr_type addr_type;
+	addr_type = s_ctrl->sensor_i2c_client->addr_type;
+	memset(data, 0x00, 8);
+	s_ctrl->sensor_i2c_client->addr_type = MSM_CAMERA_I2C_BYTE_ADDR;
+
+	rc =  s_ctrl->sensor_i2c_client->i2c_func_tbl->i2c_read_seq
+	 (
+		s_ctrl->sensor_i2c_client,
+		reg_addr, &data[0],
+		8);
+	if (rc < 0) {
+		pr_err("%s: line %d rc = %d\n", __func__, __LINE__, rc);
+	}
+	s_ctrl->sensor_i2c_client->addr_type = addr_type;
+	//CDBG("sss %x %x %x %x\n", data[0],data[1],data[2],data[3]);
+	return rc;
+}
+
+static int zte_adaptive_imx135_z5s_069(struct msm_sensor_ctrl_t* s_ctrl)
+{
+	int rc;
+	s_ctrl->sensor_i2c_client->cci_client->sid = 0x18 >> 1;
+	rc = RegRead8byte_adaptive(0x94, s_ctrl);
+	if (rc < 0){
+		pr_err("%s rc=%d\n", __func__, rc);
+	}
+	s_ctrl->sensor_i2c_client->cci_client->sid = s_ctrl->sensordata->slave_info->sensor_slave_addr >> 1;
+	return rc;
+}
 
 static struct msm_sensor_ctrl_t imx135_s_ctrl = {
 	.sensor_i2c_client = &imx135_sensor_i2c_client,
-#ifdef CONFIG_ZTEMT_CAMERA_OIS
-	.zte_otp_enable = true,
-#endif
+	//added by congshan start
+	.zte_adaptive_sensor = zte_adaptive_imx135_z5s_069,
+	//added by congshan end
 	.power_setting_array.power_setting = imx135_power_setting,
 	.power_setting_array.size = ARRAY_SIZE(imx135_power_setting),
 	.msm_sensor_mutex = &imx135_mut,

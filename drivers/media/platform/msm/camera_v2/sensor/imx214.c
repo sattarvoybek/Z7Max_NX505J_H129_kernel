@@ -11,6 +11,9 @@
  *
  */
 #include "msm_sensor.h"
+#include "../../../../../../video/msm/mdss/mdss_fb.h"
+extern struct msm_fb_data_type *zte_camera_mfd;
+
 #define IMX214_SENSOR_NAME "imx214"
 DEFINE_MSM_MUTEX(imx214_mut);
 
@@ -46,6 +49,46 @@ static struct msm_sensor_power_setting imx214_power_setting[] = {
 		.delay = 1,
 	},
 #endif
+
+#ifdef CONFIG_ZTE_CAMERA_NX504J
+{
+		.seq_type = SENSOR_VREG,
+		.seq_val = 0,
+		.config_val = 0,
+		.delay = 0,
+	},
+	{
+		.seq_type = SENSOR_VREG,
+		.seq_val = 1,
+		.config_val = 0,
+		.delay = 0,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_VANA,
+		.config_val = GPIO_OUT_LOW,
+		.delay = 1,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_VANA,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 1,
+	},
+
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_VAF,
+		.config_val = GPIO_OUT_LOW,
+		.delay = 1,
+	},
+	{
+		.seq_type = SENSOR_GPIO,
+		.seq_val = SENSOR_GPIO_VAF,
+		.config_val = GPIO_OUT_HIGH,
+		.delay = 1,
+	},
+#else
 #ifdef CONFIG_ZTE_CAMERA_NX506J
 #else
 	{
@@ -67,7 +110,8 @@ static struct msm_sensor_power_setting imx214_power_setting[] = {
 		.config_val = 0,
 		.delay = 0,
 	},
-	
+#endif	
+
 #ifdef CONFIG_ZTE_CAMERA_NX506J
 	{
 		.seq_type = SENSOR_GPIO,
@@ -211,6 +255,9 @@ static struct msm_sensor_ctrl_t imx214_s_ctrl = {
 	.sensor_i2c_client = &imx214_sensor_i2c_client,
 	.power_setting_array.power_setting = imx214_power_setting,
 	.power_setting_array.size = ARRAY_SIZE(imx214_power_setting),
+	//.zte_workquene_init = zte_workquene_init_imx214,
+	//.zte_workquene_schedule = zte_workquene_schedule_imx214,
+	//.zte_workquene_cancel = zte_workquene_cancel_imx214,
 	.msm_sensor_mutex = &imx214_mut,
 	.sensor_v4l2_subdev_info = imx214_subdev_info,
 	.sensor_v4l2_subdev_info_size = ARRAY_SIZE(imx214_subdev_info),

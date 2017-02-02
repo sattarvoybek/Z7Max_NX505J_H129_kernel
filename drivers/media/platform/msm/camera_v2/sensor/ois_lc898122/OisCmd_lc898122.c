@@ -2086,7 +2086,7 @@ void StbOnn_lc898122( void )
 {
 	unsigned char	UcRegValx,UcRegValy;					// Registor value 
 	unsigned char	UcRegIni ;
-#ifdef CONFIG_IMX135_GBAO_LC898122
+#if defined(CONFIG_IMX135_GBAO_LC898122) || defined(CONFIG_IMX214_LC898122)
 	int zte_times = 500;
 #endif
 	RegReadA_lc898122( WH_EQSWX , &UcRegValx ) ;			// 0x0170
@@ -2104,7 +2104,8 @@ void StbOnn_lc898122( void )
 		while( (UcRegIni & 0x77) != 0x66 )
 		{
 			RegReadA_lc898122( RH_SMTSRVSTT,	&UcRegIni ) ;		// 0x01F8		Smooth Servo phase read
-#ifdef CONFIG_IMX135_GBAO_LC898122
+			
+#if defined(CONFIG_IMX135_GBAO_LC898122) || defined(CONFIG_IMX214_LC898122)
 			if (--zte_times == 0)
 				break;
 #endif

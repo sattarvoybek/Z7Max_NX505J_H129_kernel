@@ -19,7 +19,7 @@
 #include <linux/io.h>
 #include <linux/list.h>
 #include <linux/delay.h>
-#include <linux/avtimer.h>
+#include <linux/avtimer_kernel.h>
 #include <media/v4l2-subdev.h>
 #include <media/msmb_isp.h>
 #include <mach/msm_bus.h>
@@ -315,6 +315,10 @@ struct msm_vfe_src_info {
 	uint32_t width;
 	long pixel_clock;
 	uint32_t input_format;/*V4L2 pix format with bayer pattern*/
+	//#ifdef CONFIG_ZTE_CAMERA_NX506J
+	#if 1 //ZTEMT rectangle_patch_from_zhigang
+	uint32_t last_updt_frm_id;
+	#endif
 };
 
 enum msm_wm_ub_cfg_type {

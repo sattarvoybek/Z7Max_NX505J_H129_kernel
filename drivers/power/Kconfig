@@ -39,7 +39,7 @@ config MAX8925_POWER
 	help
 	  Say Y here to enable support for the battery charger in the Maxim
 	  MAX8925 PMIC.
-	  
+
 config WM831X_BACKUP
 	tristate "WM831X backup battery charger support"
 	depends on MFD_WM831X
@@ -510,75 +510,51 @@ config ZTEMT_CHARGE_BQ24192
 	help
 	  ZTEMT Charge bq24192
 
-config ZTEMT_BATTERY_MAX17050
-	bool "ZTEMT battery max17050"
-	default n
-	help
-	  ZTEMT battery max17050
-	  
 config ZTEMT_CHARGE_QPNP
 	bool "ZTEMT Charge qpnp"
 	default n
 	help
 	  ZTEMT Charge qpnp
-
-config ZTEMT_NX601J_CHARGE
-	bool "ZTEMT NX601J bq charger and maxim bms"
-	default n
-	help
-	  ZTEMT bq charger and maxim  bms
-	  
 config ZTEMT_NX506J_CHARGE
 	bool "ZTEMT NX506J bq charger and qcom bms"
 	default n
 	help
 	  ZTEMT bq charger and qcom bms
-
-config ZTEMT_NX504J_CHARGE
-	bool "ZTEMT NX504J Charge"
-	default n
-	help
-	  ZTEMT NX504J Charge 
-
 config ZTEMT_COMM_CHARGE
 	bool "ZTEMT comm qpnp Charge"
 	default n
 	help
 	  ZTEMT comm qpnp Charge 
-
 config ZTEMT_CHARGE_SUB
 	bool "ZTEMT  Charge feature for special function"
 	default n
 	help
 	  ZTEMT  Charge feature for special function
-
 config ZTEMT_CHG_PARAM_CHECK
 	bool "ZTEMT  Charge parameters check"
 	default n
 	help
 	  ZTEMT  Charge parameters check
-
 ################ztemt battery config
-config ZTEMT_BATT_2300MAH
+config ZTEMT_NX507_BATT_2300MAH
 	bool "ZTEMT 2300mAh battery for nx507"
 	default n
 	help
 	  ZTEMT 2300mAh battery
+
+config ZTEMT_BATT_3000MAH_NX506J
+	bool "ZTEMT 3000mAh battery for nx506"
+	default n
+	help
+	  ZTEMT 3000mAh battery
 
 config ZTEMT_BATT_3000MAH
 	bool "ZTEMT 3000mAh battery for nx505"
 	default n
 	help
 	  ZTEMT 3000mAh battery
-
-config ZTEMT_NX503A_CHARGE
-	bool "ZTEMT 2300mAh battery"
-	default n
-	help
-	  ZTEMT 2300mAh battery
 endmenu
 ################ZTEMT end
-	  
 config QPNP_BMS
 	tristate "QPNP Battery Monitoring System driver"
 	depends on SPMI
@@ -627,5 +603,12 @@ config ZTEMT_HW_VERSION_NX507J
 	default n
 	help
 	  ZTEMT HW VERSION NX507J
-	  
+
+config ZTEMT_HW_VERSION_NX514J
+	bool "ZTEMT HW VERSION NX514J"
+	depends on ZTEMT_HW_VERSION
+	default n
+	help
+	  ZTEMT HW VERSION NX514J
+ 
 endif # POWER_SUPPLY

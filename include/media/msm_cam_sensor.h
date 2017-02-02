@@ -40,14 +40,22 @@
 #define MAX_ACTUATOR_REGION 5
 #define MAX_ACTUATOR_INIT_SET 12
 #define MAX_ACTUATOR_REG_TBL_SIZE 8
+#define MAX_ACTUATOR_AF_TOTAL_STEPS 1024
 
 #define MOVE_NEAR 0
 #define MOVE_FAR  1
+
+#define MSM_ACTUATOR_MOVE_SIGNED_FAR -1
+#define MSM_ACTUATOR_MOVE_SIGNED_NEAR  1
 
 #define MAX_EEPROM_NAME 32
 
 #define MAX_AF_ITERATIONS 3
 #define MAX_NUMBER_OF_STEPS 47
+
+#if ((defined CONFIG_ZTE_CAMERA_DUAL_LED) || (defined ZTEMT_CAMERA_DUAL_LED))
+#define MAX_LED_TRIGGERS 3
+#endif
 
 enum flash_type {
 	LED_FLASH = 1,
@@ -478,6 +486,13 @@ enum msm_sensor_cfg_type_t {
 	CFG_SET_AUTOFOCUS,
 	CFG_CANCEL_AUTOFOCUS,
 	CFG_SET_MANUAL_AF_ZTEMT,           //ZTEMT: Jinghongliang Add For Manual AF Mode
+	//	#ifdef CONFIG_ZTEMT_CAMERA_OIS     //ZTEMT CAMERA FOR OIS MENU ----START
+	CFG_ENABLE_OIS,
+	CFG_DISABLE_OIS,
+   //  #endif                             //ZTEMT CAMERA FOR OIS MENU ----END
+           // ZTEMT: peijun add for setBacklight -----start
+	CFG_SET_ZTE_BACKLIGHT,
+	// ZTEMT: peijun add for setBacklight -----end
 };
 
 enum msm_actuator_cfg_type_t {
@@ -632,7 +647,11 @@ enum msm_camera_led_config_t {
 struct msm_camera_led_cfg_t {
 	enum msm_camera_led_config_t cfgtype;
 	uint32_t torch_current;
-	uint32_t flash_current[2];
+	#if ((defined CONFIG_ZTE_CAMERA_DUAL_LED) || (defined ZTEMT_CAMERA_DUAL_LED))
+	uint32_t flash_current[MAX_LED_TRIGGERS];
+	#else
+    uint32_t flash_current[2];
+    #endif
 };
 
 /* sensor init structures and enums */

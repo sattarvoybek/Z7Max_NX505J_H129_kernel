@@ -11,36 +11,34 @@
  *
  */
 
+#include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/device.h>
+#include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/err.h>
-#include <linux/spmi.h>
+#include <linux/spinlock.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/delay.h>
 #include <linux/spinlock.h>
-#include <ztemt_hw_version.h>
+#include <linux/ztemt_hw_version.h>
+
+//#define CONFIG_ZTEMT_HW_VERSION_DEBUG
+//#ifdef CONFIG_ZTEMT_HW_VERSION_DEBUG
+//#define ztemt_hw_version_debug(fmt, args...) printk(KERN_DEBUG "[ztemt_hw_version_debug]"fmt, ##args)
+//#else
+//#define ztemt_hw_version_debug(fmt, args...) do {} while(0)
+//#endif
 
 //#define CONFIG_ZTEMT_HW_VERSION_DEBUG
 #ifdef CONFIG_ZTEMT_HW_VERSION_DEBUG
-#define ztemt_hw_version_debug(fmt, args...) printk(KERN_DEBUG "[ztemt_hw_version_debug]"fmt, ##args)
+static int debug_value=1;
 #else
-#define ztemt_hw_version_debug(fmt, args...) do {} while(0)
+static int debug_value=0;
 #endif
+#define ztemt_hw_version_debug(fmt, args...) do {if(debug_value==1)printk(KERN_DEBUG "[ztemt_hw_version]"fmt, ##args);} while(0)
 
-#define QPNP_ZTEMT_HW_VERSION_DEV_NAME	"qcom,qpnp-ztemt_hw_version"
-
-/**
- * struct qpnp_chg_chip - device information
- * @dev:			device pointer to access the parent
- * @spmi:			spmi pointer to access spmi information
- */
-struct qpnp_ztemt_hw_version_chip {
-	struct device	     *dev;
-	struct spmi_device	 *spmi;
-	struct work_struct	 work;
-	struct mutex	     lock;
-};
 
 #ifdef CONFIG_ZTEMT_HW_VERSION_NX601J
 static const struct hardware_id_map_st hardware_id_map[] = {
@@ -49,12 +47,12 @@ static const struct hardware_id_map_st hardware_id_map[] = {
 };
 #elif defined CONFIG_ZTEMT_HW_VERSION_NX504J
 static const struct hardware_id_map_st hardware_id_map[] = {
-	{0, 200,NX504J_HW_A,"ZTEMT_NX504J_A"},  //id_mv=0
-	{200, 550,NX504J_HW_B,"ZTEMT_NX504J_B"},  //id_mv=416
-	{550, 900,NX504J_HW_C,"ZTEMT_NX504J_C"},  //id_mv=720
-	{900, 1300,NX504J_HW_D,"ZTEMT_NX504J_D"},  //id_mv=1120
-	{1300, 1650,NX504J_HW_E,"ZTEMT_NX504J_E"},  //id_mv=1475
-	{1650, 1900,NX504J_HW_F,"ZTEMT_NX504J_F"},  //id_mv=1800
+	{0, 200,NX504J_HW_A,"NX504JMB_A"},  //id_mv=0
+	{200, 600,NX504J_HW_B,"NX504JMB_B"},  //id_mv=416
+	{600, 900,NX504J_HW_C,"NX504JMB_C"},  //id_mv=720
+	{900, 1300,NX504J_HW_D,"NX504JMB_D"},  //id_mv=1120
+	{1300, 1650,NX504J_HW_E,"NX504JMB_E"},  //id_mv=1475
+	{1650, 1800,NX504J_HW_F,"NX504JMB_F"},  //id_mv=1800
 };
 #elif defined CONFIG_ZTEMT_HW_VERSION_NX505J
 static const struct hardware_id_map_st hardware_id_map[] = {
@@ -81,11 +79,25 @@ static const struct hardware_id_map_st hardware_id_map[] = {
 	{200,  550,   0,    200,  NX507J_HW_C,"NX507JMB_C","SC"},  //id_mv=416   id_mv_2=9
 	{1650, 1900,  1650, 1900, NX507J_HW_D,"NX507JMB_B","JD"},  //id_mv=1786  id_mv_2=1786
 	{200,  550,   1650, 1900, NX507J_HW_E,"NX507JMB_C","JD"},  //id_mv=416   id_mv_2=1786
+	{1650, 1900,  600,  850,  NX507J_HW_F,"NX507HMB_B","CU"},  //id_mv=1786   id_mv_2=724
 };
-#else 
+#elif defined CONFIG_ZTEMT_HW_VERSION_NX514J
 static const struct hardware_id_map_st hardware_id_map[] = {
-	{0, 200,HW_A,"ZTEMT_UN_A"},  //id_mv=0
-	{700, 1100,HW_B,"ZTEMT_UN_B"},  //id_mv=900
+	{0, 300,NX514J_HW_A,"NX514JMB_A"},	//id_mv=0	
+	{300, 600,NX514J_HW_B,"NX514JMB_B"},  //id_mv=544
+	{600, 900,NX514J_HW_C,"NX514JMB_C"},  //id_mv=720
+	{900, 1200,NX514J_HW_D,"NX514JMB_D"},  //id_mv=1120
+	{1200, 1500,NX514J_HW_E,"NX514JMB_E"},	//id_mv=1475
+	{1500, 1800,NX514J_HW_F,"NX514JMB_F"},	//id_mv=1800	
+};
+#else
+static const struct hardware_id_map_st hardware_id_map[] = {
+    {0, 300,HW_A,"ZTEMT_UN_A"},	//id_mv=0	
+	{300, 600,HW_B,"ZTEMT_UN_B"},  //id_mv=544
+	{600, 900,HW_C,"ZTEMT_UN_C"},  //id_mv=720
+	{900, 1200,HW_D,"ZTEMT_UN_D"},  //id_mv=1120
+	{1200, 1500,HW_E,"ZTEMT_UN_E"},	//id_mv=1475
+	{1500, 1800,HW_F,"ZTEMT_UN_F"},	//id_mv=1800
 };
 #endif
 
@@ -177,7 +189,7 @@ int ztemt_get_hw_id(void)
 	//printk("hw_id_mv=%d mv hw_id=%d hw_ver=%s\n",
 	    //ztemt_hw_mv,ztemt_hw_id,hardware_id_map[ztemt_hw_id].hw_ver);
     ztemt_hw_version_debug("hw_id_mv=%d mv hw_id=%d hw_ver=%s\n",
-		ztemt_hw_mv,ztemt_hw_id,hardware_id_map[ztemt_hw_id].hw_ver);
+		    ztemt_hw_mv,ztemt_hw_id,hardware_id_map[ztemt_hw_id].hw_ver);
 #endif
 
 	return ztemt_hw_id;
@@ -200,16 +212,16 @@ void ztemt_get_hw_version(char* result)
 }
 EXPORT_SYMBOL_GPL(ztemt_get_hw_version);
 
-static ssize_t ztemt_hw_version_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
+static ssize_t ztemt_hw_version_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
 {
     ztemt_get_hw_version(buf);
-    //printk("%s : %d : ztemt_hw_version=%s\n",__func__,__LINE__,buf);
-    ztemt_hw_version_debug("ztemt_hw_version=%s\n",buf);
-    return sprintf(buf,"%s\n",buf);
+    //printk("%s : %d : version=%s\n",__func__,__LINE__,buf);
+    ztemt_hw_version_debug("version=%s\n",buf);
+    return sprintf(buf,"%s",buf);
 }
-
-static DEVICE_ATTR(ztemt_hw_version, 0664, ztemt_hw_version_show, NULL);
+static struct kobj_attribute version_attr=
+    __ATTR(version, 0664, ztemt_hw_version_show, NULL);
 
 
 #ifdef CONFIG_ZTEMT_HW_VERSION_NX507J
@@ -228,95 +240,85 @@ void ztemt_get_hw_sc(char* result)
 }
 EXPORT_SYMBOL_GPL(ztemt_get_hw_sc);
 
-static ssize_t ztemt_hw_sc_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
+static ssize_t ztemt_hw_sc_show(struct kobject *kobj, 
+		struct kobj_attribute *attr, char *buf)
 {
     ztemt_get_hw_sc(buf);
-    //printk("%s : %d : ztemt_hw_sc=%s\n",__func__,__LINE__,buf);
-    ztemt_hw_version_debug("ztemt_hw_sc=%s\n",buf);
-    return sprintf(buf,"%s\n",buf);
+    //printk("%s : %d : sc=%s\n",__func__,__LINE__,buf);
+    ztemt_hw_version_debug("sc=%s\n",buf);
+    return sprintf(buf,"%s",buf);
 }
-
-static DEVICE_ATTR(ztemt_hw_sc, 0664, ztemt_hw_sc_show, NULL);
+static struct kobj_attribute sc_attr=
+    __ATTR(sc, 0664, ztemt_hw_sc_show, NULL);
 #endif
 
-/*
+
+static ssize_t debug_value_store(struct kobject *kobj,
+	    struct kobj_attribute *attr, const char *buf, size_t count)
+{
+    sscanf(buf, "%d", &debug_value);
+    return count;
+}
+
+static ssize_t debug_value_show(struct kobject *kobj,
+	   struct kobj_attribute *attr, char *buf)
+{
+    return sprintf(buf, "%d", debug_value);	
+}
+
+static struct kobj_attribute debug_value_attr=
+    __ATTR(debug_value, 0664, debug_value_show, debug_value_store);
+
+
 static struct attribute *ztemt_hw_version_attrs[] = {
-    &dev_attr_ztemt_hw_version.attr,
-    NULL
-};
-static const struct attribute_group ztemt_hw_version_attr_group = {
-	.attrs = ztemt_hw_version_attrs,
-};
-*/
-
-static int __devinit
-qpnp_ztemt_hw_version_probe(struct spmi_device *spmi)
-{
-	
-	struct qpnp_ztemt_hw_version_chip	*chip;
-	int rc = 0;
-
-	chip = devm_kzalloc(&spmi->dev,
-			sizeof(struct qpnp_ztemt_hw_version_chip), GFP_KERNEL);
-	if (chip == NULL) {
-		pr_err("qpnp_ztemt_hw_version_probe : kzalloc() failed.\n");
-		return -ENOMEM;
-	}
-    dev_set_drvdata(&spmi->dev, chip);
-	chip->dev = &(spmi->dev);
-	chip->spmi = spmi;
-	
-    rc=sysfs_create_file(&chip->dev->kobj,&dev_attr_ztemt_hw_version.attr);
-    
+    &debug_value_attr.attr,
+    &version_attr.attr,
 #ifdef CONFIG_ZTEMT_HW_VERSION_NX507J
-	rc |=sysfs_create_file(&chip->dev->kobj,&dev_attr_ztemt_hw_sc.attr);
+    &sc_attr.attr,
 #endif
-
-	//rc=sysfs_create_group(&chip->dev->kobj,&ztemt_hw_version_attr_group);
-	return rc;
-}
-
-static int __devexit
-qpnp_ztemt_hw_version_remove(struct spmi_device *spmi)
-{
-	struct qpnp_ztemt_hw_version_chip *chip = dev_get_drvdata(&spmi->dev);
-    devm_kfree(&spmi->dev,chip);
-	return 0;
-}
-
-static struct of_device_id qpnp_ztemt_hw_version_match_table[] = {
-	{ .compatible = QPNP_ZTEMT_HW_VERSION_DEV_NAME, },
-	{}
+    NULL,
 };
 
-static struct spmi_driver qpnp_ztemt_hw_version_driver = {
-	.probe		= qpnp_ztemt_hw_version_probe,
-	.remove		= __devexit_p(qpnp_ztemt_hw_version_remove),
-	.driver		= {
-		.name		    = QPNP_ZTEMT_HW_VERSION_DEV_NAME,
-		.owner		    = THIS_MODULE,
-		.of_match_table	= qpnp_ztemt_hw_version_match_table,
-	},
+static struct attribute_group ztemt_hw_version_attr_group = {
+    .attrs = ztemt_hw_version_attrs,
 };
 
-/**
- * qpnp_ztemt_hw_version_init() - register spmi driver for qpnp-ztemt_hw_version
- */
+
+struct kobject *hw_version_kobj;
+
 int __init
-qpnp_ztemt_hw_version_init(void)
+ztemt_hw_version_init(void)
 {
-	return spmi_driver_register(&qpnp_ztemt_hw_version_driver);
+    int rc = 0;
+
+    ztemt_hw_version_debug("ztemt_hw_version creat attributes start \n");
+  
+    //hw_version__kobj = kobject_create_and_add("ztemt_hw_version", kernel_kobj);
+    hw_version_kobj = kobject_create_and_add("ztemt_hw_version", NULL);
+    if (!hw_version_kobj){
+	printk(KERN_ERR "%s: ztemt_hw_version kobj create error\n", __func__);
+	return -ENOMEM;
+    }
+
+    rc=sysfs_create_group(hw_version_kobj,&ztemt_hw_version_attr_group);
+    if(rc)
+      printk(KERN_ERR "%s: failed to create ztemt_hw_version group attributes\n", __func__);
+
+    ztemt_hw_version_debug("ztemt_hw_version creat attributes end \n");
+    return rc;
 }
-module_init(qpnp_ztemt_hw_version_init);
+
 
 static void __exit
-qpnp_ztemt_hw_version_exit(void)
+ztemt_hw_version_exit(void)
 {
-	spmi_driver_unregister(&qpnp_ztemt_hw_version_driver);
+    sysfs_remove_group(hw_version_kobj,&ztemt_hw_version_attr_group);
+    kobject_put(hw_version_kobj);	
 }
-module_exit(qpnp_ztemt_hw_version_exit);
 
-MODULE_DESCRIPTION("qpnp ztemt_hw_version driver");
+module_init(ztemt_hw_version_init);
+module_exit(ztemt_hw_version_exit);
+
+MODULE_DESCRIPTION("ztemt_hw_version driver");
 MODULE_LICENSE("GPL v2");
-MODULE_ALIAS("platform:" QPNP_ZTEMT_HW_VERSION_DEV_NAME);
+MODULE_ALIAS("platform:ztemt_hw_version" );
